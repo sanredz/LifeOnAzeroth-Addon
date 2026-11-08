@@ -3,6 +3,8 @@
 The auction house market from [lifeonazeroth.com](https://lifeonazeroth.com/#economy), inside WoW: Forever.
 
 - **Price indexes** for the whole market, sectors, materials, consumables and gear, with trends and change over the last 6 hours, a day, a week, a month or all time. **Prices update every hour**, and the last three days are kept hour by hour.
+- **Your own auction house:** prices for your ruleset and faction, so they match what you see in game. Switch to any other house with one click.
+- **Item tooltips** show the typical price, and the stack price when you hover a stack.
 - **Charts** that compare up to five indexes or items.
 - **Item search** across everything seen on the auction house, with typical and cheapest price, auctions, items for sale and vendor price.
 - **Item cards** with price history, items for sale each hour, the price in every region and similar items.

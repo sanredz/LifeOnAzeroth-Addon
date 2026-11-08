@@ -173,6 +173,39 @@ namespace LifeOnAzeroth
             return found;
         }
 
+        static readonly string[] HouseKeys = { "0A", "0H", "0B", "1A", "1H", "1B", "2A", "2H", "2B", "3A", "3H", "3B" };
+
+        static HashSet<string> WantedHouses(string forever)
+        {
+            var found = new HashSet<string>();
+            try
+            {
+                string acc = Path.Combine(forever, "WTF", "Account");
+                if (Directory.Exists(acc))
+                    foreach (string dir in Directory.GetDirectories(acc))
+                    {
+                        string f = Path.Combine(dir, "SavedVariables", AddonName + ".lua");
+                        if (!File.Exists(f)) continue;
+                        var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(f), @"\[""houses""\]\s*=\s*\{([^}]*)\}");
+                        if (!m.Success) continue;
+                        foreach (System.Text.RegularExpressions.Match n in System.Text.RegularExpressions.Regex.Matches(m.Groups[1].Value, @"\[""([0-3][AHB])""\]"))
+                        {
+                            found.Add(n.Groups[1].Value);
+                            found.Add(n.Groups[1].Value.Substring(0, 1) + "B");
+                        }
+                    }
+            }
+            catch { }
+            if (found.Count == 0)
+                foreach (string sn in KnownRulesets(forever))
+                {
+                    int si = Array.IndexOf(SetNames, sn);
+                    if (si >= 0) { found.Add(si + "A"); found.Add(si + "H"); found.Add(si + "B"); }
+                }
+            if (found.Count == 0) foreach (string hk in HouseKeys) found.Add(hk);
+            return found;
+        }
+
         static void WriteState(StringBuilder sb, Dictionary<string, object> state)
         {
             var T = Arr(Field(state, "t")).Select(Lng).ToArray();
@@ -222,7 +255,7 @@ namespace LifeOnAzeroth
             sb.Append("},\n");
         }
 
-        const int Format = 4;
+        const int Format = 5;
 
         static int DataFormat(string file)
         {
@@ -365,24 +398,23 @@ namespace LifeOnAzeroth
                 progress("Downloading prices in other regions", 0.1 + 0.03 * done++);
                 try { markets[r] = Obj(Json(Get("/market/" + r))); } catch { }
             }
-            var sets = new Dictionary<string, Dictionary<string, object>>();
-            for (int si = 0; si < SetNames.Length; si++)
+            var houses = new Dictionary<string, Dictionary<string, object>>();
+            int hd = 0;
+            foreach (string hk in HouseKeys)
             {
-                progress("Downloading ruleset prices", 0.19 + 0.01 * si);
-                try { sets[SetNames[si]] = Obj(Json(Get("/market/" + region + "/rs/" + SetSlugs[si]))); } catch { }
+                progress("Downloading prices for each auction house", 0.19 + 0.003 * hd++);
+                try { houses[hk] = Obj(Json(Get("/market/" + region + "/house/" + hk))); } catch { }
             }
 
             var keep = Thin(T);
             var HT = keep.Select(i => T[i]).ToArray();
-            var wanted = KnownRulesets(forever);
-            if (wanted.Count == 0) foreach (string sn in SetNames) wanted.Add(sn);
+            var wanted = WantedHouses(forever);
             var pos = new Dictionary<long, int>();
             for (int k = 0; k < keep.Count; k++) pos[T[keep[k]]] = k;
             int K = keep.Count;
 
-            var hist = new SortedDictionary<long, long[][]>();
-            var histRs = new Dictionary<string, SortedDictionary<long, long[][]>>();
-            foreach (string sn in SetNames) histRs[sn] = new SortedDictionary<long, long[][]>();
+            var histH = new Dictionary<string, SortedDictionary<long, long[][]>>();
+            foreach (string hk in HouseKeys) histH[hk] = new SortedDictionary<long, long[][]>();
             int shardsDone = 0;
             var lockObj = new object();
             Exception shardErr = null;
@@ -393,28 +425,22 @@ namespace LifeOnAzeroth
                     var d = Obj(Json(Get("/shard/" + region + "/" + sh)));
                     var st = Arr(Field(d, "t")).Select(Lng).ToArray();
                     var items = Obj(Field(d, "i"));
-                    var local = new Dictionary<long, long[][]>();
-                    var localRs = new List<KeyValuePair<string, KeyValuePair<long, long[][]>>>();
+                    var localH = new List<KeyValuePair<string, KeyValuePair<long, long[][]>>>();
                     foreach (var kv in items)
                     {
                         var arrs = Arr(kv.Value);
-                        if (arrs.Length < 3) continue;
+                        if (arrs.Length < 5) continue;
                         long id = long.Parse(kv.Key, Inv);
-                        var outA = Trim(Align(arrs, st, pos, K), HT);
-                        if (outA != null) local[id] = outA;
-                        if (arrs.Length > 3)
-                            foreach (var rkv in Obj(arrs[3]))
-                            {
-                                int si;
-                                if (!int.TryParse(rkv.Key, out si) || si < 0 || si >= SetNames.Length || !wanted.Contains(SetNames[si])) continue;
-                                var ra = Trim(Align(Arr(rkv.Value), st, pos, K), HT);
-                                if (ra != null) localRs.Add(new KeyValuePair<string, KeyValuePair<long, long[][]>>(SetNames[si], new KeyValuePair<long, long[][]>(id, ra)));
-                            }
+                        foreach (var hkv in Obj(arrs[4]))
+                        {
+                            if (!wanted.Contains(hkv.Key) || !histH.ContainsKey(hkv.Key)) continue;
+                            var ha = Trim(Align(Arr(hkv.Value), st, pos, K), HT);
+                            if (ha != null) localH.Add(new KeyValuePair<string, KeyValuePair<long, long[][]>>(hkv.Key, new KeyValuePair<long, long[][]>(id, ha)));
+                        }
                     }
                     lock (lockObj)
                     {
-                        foreach (var kv in local) hist[kv.Key] = kv.Value;
-                        foreach (var kv in localRs) histRs[kv.Key][kv.Value.Key] = kv.Value.Value;
+                        foreach (var kv in localH) histH[kv.Key][kv.Value.Key] = kv.Value.Value;
                         shardsDone++;
                         progress("Downloading price history", 0.22 + 0.7 * shardsDone / 64.0);
                     }
@@ -456,18 +482,17 @@ namespace LifeOnAzeroth
             foreach (var mk in markets)
                 sb.Append(mk.Key).Append(" = ").Append(LuaStr(LatestLines(Obj(Field(mk.Value, "latest"))))).Append(",\n");
             sb.Append("},\n");
-            WriteHist(sb, hist);
-            sb.Append("rs = {\n");
-            foreach (string sn in SetNames)
+            sb.Append("houses = {\n");
+            foreach (string hk in HouseKeys)
             {
-                Dictionary<string, object> sm;
-                if (!sets.TryGetValue(sn, out sm)) continue;
-                var sst = Obj(Field(sm, "state"));
-                if (Arr(Field(sst, "t")).Length == 0) continue;
-                sb.Append("[").Append(LuaStr(sn)).Append("] = {\n");
-                WriteState(sb, sst);
-                sb.Append("latS = ").Append(LuaStr(LatestLines(Obj(Field(sm, "latest"))))).Append(",\n");
-                if (wanted.Contains(sn)) WriteHist(sb, histRs[sn]); else sb.Append("hist = {},\nnohist = true,\n");
+                Dictionary<string, object> hm;
+                if (!houses.TryGetValue(hk, out hm)) continue;
+                var hst = Obj(Field(hm, "state"));
+                if (Arr(Field(hst, "t")).Length == 0) continue;
+                sb.Append("[").Append(LuaStr(hk)).Append("] = {\n");
+                WriteState(sb, hst);
+                sb.Append("latS = ").Append(LuaStr(LatestLines(Obj(Field(hm, "latest"))))).Append(",\n");
+                if (wanted.Contains(hk)) WriteHist(sb, histH[hk]); else sb.Append("hist = {},\nnohist = true,\n");
                 sb.Append("},\n");
             }
             sb.Append("},\n}\n");

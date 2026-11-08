@@ -346,7 +346,7 @@ local function paintHeader()
   local d = D()
   local rn = NS.REGION_NAME[d.region] or string.upper(d.region or "")
   local V, rs = NS.view()
-  main.note:SetText(rn .. (rs and (" \194\183 " .. rs) or "") .. (V.t[1] and (" \194\183 tracked since " .. date("%b %d", V.t[1])) or ""))
+  main.note:SetText(rn .. (rs and (" \194\183 " .. NS.houseName(rs) .. " auction house") or "") .. (V.t and V.t[1] and (" \194\183 since " .. date("%b %d", V.t[1])) or ""))
   main.fresh:SetText("Prices " .. NS.ago(d.built) .. " \194\183 " .. date("%b %d, %H:%M", d.built))
   local old = time() - (d.built or 0) > 3 * 3600
   local c = old and NS.COL.dn or NS.COL.muted
@@ -367,12 +367,19 @@ function NS.Refresh()
   main.body:Show()
   main.ranges:Select(NS.db.range)
   local d = D()
-  main.rsSeg:Select(NS.ruleset() or "all")
+  local key, mine = NS.ruleset(), NS.myHouse()
+  main.rsSeg:Select(key and string.sub(key, 1, 1))
+  main.facSeg:Select(key and string.sub(key, 2, 2))
   for _, b in ipairs(main.rsSeg.buttons) do
-    local ok = b.key == "all" or (d.rs and d.rs[b.key] and d.rs[b.key].t and #d.rs[b.key].t >= 2)
+    b.mine = mine and string.sub(mine, 1, 1) == b.key
+    b.label:SetText(b.text .. (b.mine and " \226\128\162" or ""))
+  end
+  for _, b in ipairs(main.facSeg.buttons) do
+    local hk = (key and string.sub(key, 1, 1) or "0") .. b.key
+    local ok = d.houses and d.houses[hk]
     b:SetEnabled(ok and true or false)
     b:SetAlpha(ok and 1 or 0.4)
-    b.mine = b.key == NS.detectRuleset()
+    b.mine = mine and string.sub(mine, 2, 2) == b.key
     b.label:SetText(b.text .. (b.mine and " \226\128\162" or ""))
   end
   paintHeader()
@@ -396,7 +403,7 @@ local function searchHits(q)
     if ok then
       local rank = n == ql and 0 or string.sub(n, 1, #ql) == ql and 1 or (string.find(" " .. n, " " .. words[1], 1, true) and 2) or 3
       local l = NS.latest(d.region, id)
-      if l or not NS.ruleset() then hits[#hits + 1] = { id, c, l, rank, l and l[4] or 0 } end
+      hits[#hits + 1] = { id, c, l, rank, l and l[4] or 0 }
     end
   end
   table.sort(hits, function(a, b) if a[4] ~= b[4] then return a[4] < b[4] end if a[5] ~= b[5] then return a[5] > b[5] end return a[2][1] < b[2][1] end)
@@ -692,25 +699,38 @@ local function build()
   f.body = body
   buildSearch(body)
   main = f
-  local keys = { "all", "PvP", "Normal", "Roleplay", "Roleplay PvP" }
-  f.rsSeg = NS.segmented(body, keys, function(k)
-    NS.db.rs = (k == NS.detectRuleset()) and "auto" or k
+  local function pick(rsKey, facKey)
+    local cur = NS.ruleset() or NS.myHouse() or "0A"
+    local hk = (rsKey or string.sub(cur, 1, 1)) .. (facKey or string.sub(cur, 2, 2))
+    if LOA_DATA and LOA_DATA.houses and not LOA_DATA.houses[hk] then hk = (rsKey or string.sub(cur, 1, 1)) .. "A" end
+    NS.db.house = (hk == NS.myHouse()) and "auto" or hk
     if NS.CloseItem then NS.CloseItem() end
     NS.Refresh()
-  end, 82)
+  end
+  f.rsSeg = NS.segmented(body, { "0", "1", "2", "3" }, function(k) pick(k, nil) end, 64)
   f.rsSeg:SetPoint("LEFT", body.search, "RIGHT", 14, 0)
-  local labels = { all = "All rulesets", PvP = "PvP", Normal = "Normal", Roleplay = "RP", ["Roleplay PvP"] = "RP-PvP" }
+  f.facSeg = NS.segmented(body, { "A", "H", "B" }, function(k) pick(nil, k) end, 84)
+  f.facSeg:SetPoint("LEFT", f.rsSeg, "RIGHT", 8, 0)
+  local rsLabels = { ["0"] = "PvP", ["1"] = "Normal", ["2"] = "RP", ["3"] = "RP-PvP" }
+  local facLabels = { A = "Alliance", H = "Horde", B = "Blackwater" }
+  local function tip(self, title, body)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine(title, NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
+    GameTooltip:AddLine(body, 1, 1, 1, true)
+    if self.mine then GameTooltip:AddLine("Your character's.", NS.COL.up[1], NS.COL.up[2], NS.COL.up[3]) end
+    if not self:IsEnabled() then GameTooltip:AddLine("No data for this auction house yet.", NS.COL.dn[1], NS.COL.dn[2], NS.COL.dn[3]) end
+    GameTooltip:Show()
+  end
   for _, b in ipairs(f.rsSeg.buttons) do
-    b.text = labels[b.key]
+    b.text = rsLabels[b.key]
     b.label:SetText(b.text)
-    b:HookScript("OnEnter", function(self)
-      GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-      GameTooltip:AddLine(self.key == "all" and "Every ruleset" or self.key, NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
-      GameTooltip:AddLine(self.key == "all" and "Prices from every auction house in your region." or ("Only auctions on " .. self.key .. " realms."), 1, 1, 1, true)
-      if self.mine then GameTooltip:AddLine("Your character's ruleset.", NS.COL.up[1], NS.COL.up[2], NS.COL.up[3]) end
-      if not self:IsEnabled() then GameTooltip:AddLine("No data for this ruleset yet.", NS.COL.dn[1], NS.COL.dn[2], NS.COL.dn[3]) end
-      GameTooltip:Show()
-    end)
+    b:HookScript("OnEnter", function(self) tip(self, NS.RULESETS[tonumber(self.key) + 1], "Every ruleset has its own auction houses.") end)
+    b:HookScript("OnLeave", function() GameTooltip:Hide() end)
+  end
+  for _, b in ipairs(f.facSeg.buttons) do
+    b.text = facLabels[b.key]
+    b.label:SetText(b.text)
+    b:HookScript("OnEnter", function(self) tip(self, facLabels[self.key] .. " auction house", self.key == "B" and "The neutral goblin auction house that both factions can use." or "Only " .. facLabels[self.key] .. " players can buy here.") end)
     b:HookScript("OnLeave", function() GameTooltip:Hide() end)
   end
   f.side = buildSide(body)
@@ -805,11 +825,20 @@ end
 
 function NS.OnLoad()
   if NS.SetupTooltips then NS.SetupTooltips() end
-  local mine = NS.detectRuleset()
-  if mine then
-    NS.db.rulesets = NS.db.rulesets or {}
-    NS.db.rulesets[mine] = time()
-  end
+  NS.events:RegisterEvent("PLAYER_ENTERING_WORLD")
+  NS.events:HookScript("OnEvent", function(_, ev)
+    if ev ~= "PLAYER_ENTERING_WORLD" then return end
+    local h = NS.myHouse()
+    if h then
+      NS.db.houses = NS.db.houses or {}
+      NS.db.houses[h] = time()
+    end
+    local rs = NS.detectRuleset()
+    if rs then
+      NS.db.rulesets = NS.db.rulesets or {}
+      NS.db.rulesets[rs] = time()
+    end
+  end)
   if type(NS.db.series) == "table" then st.series = NS.db.series else NS.db.series = st.series end
   minimapButton()
 end

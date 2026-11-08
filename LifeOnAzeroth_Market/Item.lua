@@ -257,7 +257,7 @@ function NS.DrawItem()
   if cur.rg ~= LOA_DATA.region then
     empty = "Price history is downloaded for " .. (NS.REGION_NAME[LOA_DATA.region] or "your region") .. " only. Pick another region in the companion app to see its history."
   elseif rs and V.nohist then
-    empty = "Price history for " .. rs .. " is only downloaded for rulesets you play. Log in on a " .. rs .. " character and it is added with the next update."
+    empty = "Price history for the " .. NS.houseName(rs) .. " auction house is only downloaded for houses you play on. Log in there and it is added with the next update."
   end
   c.chart:Draw(list, { span = span, abs = true, fill = true, emptyText = empty })
   local vol = c.vol
@@ -323,8 +323,8 @@ function NS.OpenItem(id, rg)
   end
   local l = NS.latest(rg, id)
   local _, rsName = NS.view()
-  c.pxLabel:SetText("Typical price \194\183 " .. (NS.REGION_NAME[rg] or rg) .. (rsName and rg == LOA_DATA.region and (" \194\183 " .. rsName) or ""))
-  c.regs.title:SetText(rsName and "Price in each region  " .. NS.color(NS.COL.muted, "every ruleset") or "Price in each region")
+  c.pxLabel:SetText("Typical price \194\183 " .. (rsName and rg == LOA_DATA.region and (NS.houseName(rsName) .. " auction house") or (NS.REGION_NAME[rg] or rg)))
+  c.regs.title:SetText("Price in each region  " .. NS.color(NS.COL.muted, "whole region"))
   c.px:SetText(l and NS.coin(l[1]) or NS.color(NS.COL.muted, "Not listed right now"))
   c.pill:SetText(l and l[5] and (NS.pctColored(l[5]) .. NS.color(NS.COL.muted, "  24h")) or "")
   c.add:SetShown(rg == LOA_DATA.region and NS.hist(id) ~= nil)

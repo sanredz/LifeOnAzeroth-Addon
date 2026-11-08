@@ -6,7 +6,7 @@ with the same name updates the page.
 
 **Summary (one line):**
 
-> Auction house prices, trends and item history for every region and ruleset in WoW Forever, right inside the game.
+> Prices, trends and item history for your own auction house in WoW Forever, right inside the game.
 
 **Description:**
 
@@ -30,6 +30,7 @@ Is Iron Ore cheap right now, or did everyone just undercut each other this morni
 - **Compare up to five** indexes or items on one chart. Hover the chart to see every line's value at that hour.
 - **Search any item** seen on the auction house and get its typical price, cheapest listing and 24-hour change as you type.
 - **Your picks stay put.** The chart remembers what you were watching the next time you log in.
+- **Prices in item tooltips:** hover anything in your bags, the bank, loot or chat and see its typical price on your auction house, and the price of the whole stack. `/market tooltip` turns it off.
 
 ## Every item has its own page
 
@@ -44,9 +45,9 @@ Click any item to see:
 
 ![An item page with price history and prices in every region](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/item.png)
 
-## Your ruleset
+## Your own auction house
 
-PvP, Normal, Roleplay and Roleplay PvP all have their own auction houses and their own prices. The Market picks yours from the realm you're on, and you can switch to any other ruleset, or all of them, with one click.
+Every ruleset has three auction houses, Alliance, Horde and the neutral Blackwater, and they have very different prices. The Market shows the prices on **your** auction house, picked from the realm you're on and your character's faction, so the numbers match what you see when you open the AH. You can switch to any other ruleset or house with one click.
 
 ## Getting prices into the game
 

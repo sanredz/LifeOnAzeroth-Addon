@@ -20,7 +20,7 @@ local function addLines(tooltip, data)
   local l = NS.latest(D.region, id)
   if not l or not l[1] or l[1] <= 0 then return end
   local rs = NS.ruleset()
-  local where = rs and NS.RULESET_SHORT[rs] or NS.REGION_NAME[D.region] or string.upper(D.region or "")
+  local where = rs and NS.houseName(rs, true) or NS.REGION_NAME[D.region] or string.upper(D.region or "")
   local g, gd = NS.COL.title2, NS.COL.ink2
   tooltip:AddLine(" ")
   tooltip:AddDoubleLine("Life on Azeroth \194\183 " .. where, l[5] and (NS.pctColored(l[5]) .. NS.color(NS.COL.muted, " 24h")) or "", g[1], g[2], g[3], 1, 1, 1)

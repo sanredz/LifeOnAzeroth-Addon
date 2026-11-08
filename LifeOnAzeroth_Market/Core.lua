@@ -112,7 +112,7 @@ function NS.Ensure()
   end
   D.lat = {}
   for rg, s in pairs(D.latS or {}) do D.lat[rg] = parseLat(s) end
-  for _, R in pairs(D.rs or {}) do
+  for _, R in pairs(D.houses or {}) do
     R.lat = parseLat(R.latS)
     R.latS = nil
   end
@@ -134,20 +134,39 @@ function NS.detectRuleset()
   return "Normal"
 end
 
+NS.FACTIONS = { A = "Alliance", H = "Horde", B = "Blackwater" }
+
+function NS.myHouse()
+  local rs = NS.detectRuleset()
+  local ok, fac = pcall(UnitFactionGroup, "player")
+  local f = ok and fac == "Alliance" and "A" or ok and fac == "Horde" and "H" or nil
+  if not rs or not f then return nil end
+  for i, n in ipairs(NS.RULESETS) do
+    if n == rs then return (i - 1) .. f end
+  end
+end
+
+function NS.houseName(key, short)
+  if not key then return nil end
+  local rs = NS.RULESETS[tonumber(string.sub(key, 1, 1)) + 1] or "?"
+  return (short and NS.RULESET_SHORT[rs] or rs) .. " " .. (NS.FACTIONS[string.sub(key, 2, 2)] or "?")
+end
+
 function NS.ruleset()
   local D = LOA_DATA
-  if not D or not D.rs then return nil end
-  local pick = NS.db and NS.db.rs
-  if pick == "all" then return nil end
-  if pick == nil or pick == "auto" then pick = NS.detectRuleset() end
-  if pick and D.rs[pick] and D.rs[pick].t and #D.rs[pick].t >= 2 then return pick end
-  return nil
+  if not D or not D.houses then return nil end
+  local pick = NS.db and NS.db.house
+  if pick == nil or pick == "auto" or not D.houses[pick] then pick = NS.myHouse() end
+  if pick and D.houses[pick] then return pick end
+  for _, k in ipairs({ "0A", "0H", "1A", "1H", "2A", "2H", "3A", "3H" }) do
+    if D.houses[k] then return k end
+  end
 end
 
 function NS.view()
   local D = LOA_DATA
-  local rs = NS.ruleset()
-  if rs then return D.rs[rs], rs end
+  local key = NS.ruleset()
+  if key then return D.houses[key], key end
   return D, nil
 end
 
