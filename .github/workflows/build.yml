@@ -45,8 +45,23 @@ jobs:
       CF_API_KEY: ${{ secrets.CF_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Prepare the addon folder for packaging
+        run: |
+          PKG="$RUNNER_TEMP/pkg"
+          mkdir -p "$PKG"
+          cp -r LifeOnAzeroth_Market/. "$PKG/"
+          {
+            echo "# Life on Azeroth: Market ${GITHUB_REF_NAME#v}"
+            echo
+            echo "The companion app that keeps prices up to date is on GitHub: https://github.com/sanredz/LifeOnAzeroth-Addon/releases/tag/$GITHUB_REF_NAME"
+          } > "$PKG/CHANGELOG.md"
+          cd "$PKG"
+          git init -q
+          git config user.name "Sanjin Redzepagic"
+          git config user.email "sr@sanred.se"
+          git add -A
+          git commit -q -m "$GITHUB_REF_NAME"
+          git tag "$GITHUB_REF_NAME"
       - uses: BigWigsMods/packager@v2
         with:
-          args: -t LifeOnAzeroth_Market
+          args: -t ${{ runner.temp }}/pkg

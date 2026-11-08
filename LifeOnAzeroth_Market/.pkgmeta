@@ -1,1 +1,5 @@
 package-as: LifeOnAzeroth_Market
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
