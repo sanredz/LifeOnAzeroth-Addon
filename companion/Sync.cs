@@ -122,13 +122,67 @@ namespace LifeOnAzeroth
             return any ? outA : null;
         }
 
+        public static List<int> Thin(long[] T)
+        {
+            var keep = new List<int>();
+            if (T.Length == 0) return keep;
+            long tmax = T[T.Length - 1];
+            string last = null;
+            for (int i = 0; i < T.Length; i++)
+            {
+                long t = T[i], age = tmax - t;
+                string bucket;
+                if (age <= 48 * 3600) bucket = "h" + i;
+                else if (age <= 14 * 86400L) bucket = "q" + (t / 21600);
+                else if (age <= 60 * 86400L) bucket = "d" + (t / 86400);
+                else bucket = "w" + (t / 604800);
+                if (bucket != last) { keep.Add(i); last = bucket; }
+            }
+            return keep;
+        }
+
+        static long[][] Trim(long[][] a, long[] ht)
+        {
+            if (a == null || ht.Length == 0) return null;
+            long tmax = ht[ht.Length - 1];
+            int lastSeen = -1;
+            for (int p = 0; p < a[0].Length; p++) if (a[0][p] > 0) lastSeen = p;
+            if (lastSeen < 0 || ht[lastSeen] < tmax - 30 * 86400L) return null;
+            for (int p = 0; p < a[1].Length; p++) if (ht[p] < tmax - 30 * 86400L) { a[1][p] = 0; a[2][p] = 0; }
+            return a;
+        }
+
+        static HashSet<string> KnownRulesets(string forever)
+        {
+            var found = new HashSet<string>();
+            try
+            {
+                string acc = Path.Combine(forever, "WTF", "Account");
+                if (!Directory.Exists(acc)) return found;
+                foreach (string dir in Directory.GetDirectories(acc))
+                {
+                    string f = Path.Combine(dir, "SavedVariables", AddonName + ".lua");
+                    if (!File.Exists(f)) continue;
+                    var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(f), @"\[""rulesets""\]\s*=\s*\{([^}]*)\}");
+                    if (!m.Success) continue;
+                    foreach (System.Text.RegularExpressions.Match n in System.Text.RegularExpressions.Regex.Matches(m.Groups[1].Value, @"\[""([^""]+)""\]"))
+                        if (SetNames.Contains(n.Groups[1].Value)) found.Add(n.Groups[1].Value);
+                }
+            }
+            catch { }
+            return found;
+        }
+
         static void WriteState(StringBuilder sb, Dictionary<string, object> state)
         {
-            sb.Append("t = {").Append(string.Join(",", Arr(Field(state, "t")).Select(x => Lng(x).ToString(Inv)))).Append("},\n");
+            var T = Arr(Field(state, "t")).Select(Lng).ToArray();
+            var keep = Thin(T);
+            sb.Append("t = {").Append(string.Join(",", keep.Select(i => T[i].ToString(Inv)))).Append("},\n");
             sb.Append("idx = {\n");
             foreach (var kv in Obj(Field(state, "idx")))
             {
-                var vals = Arr(kv.Value).Select(x => x == null ? "" : Dec(Num(x)));
+                var all = Arr(kv.Value);
+                var vals = keep.Select(i => i < all.Length && all[i] != null ? Dec(Num(all[i])) : "");
                 sb.Append("[").Append(LuaStr(kv.Key)).Append("] = ").Append(LuaStr(string.Join(",", vals))).Append(",\n");
             }
             sb.Append("},\ncounts = {\n");
@@ -168,7 +222,7 @@ namespace LifeOnAzeroth
             sb.Append("},\n");
         }
 
-        const int Format = 2;
+        const int Format = 3;
 
         static int DataFormat(string file)
         {
@@ -318,16 +372,10 @@ namespace LifeOnAzeroth
                 try { sets[SetNames[si]] = Obj(Json(Get("/market/" + region + "/rs/" + SetSlugs[si]))); } catch { }
             }
 
-            var keep = new List<int>();
-            long tmax = T[T.Length - 1];
-            long lastBucket = long.MinValue;
-            for (int i = 0; i < T.Length; i++)
-            {
-                long t = T[i];
-                if (t >= tmax - 72 * 3600) { keep.Add(i); continue; }
-                long bucket = t >= tmax - 14 * 86400 ? t / 21600 : -(t / 86400) - 1;
-                if (bucket != lastBucket) { keep.Add(i); lastBucket = bucket; }
-            }
+            var keep = Thin(T);
+            var HT = keep.Select(i => T[i]).ToArray();
+            var wanted = KnownRulesets(forever);
+            if (wanted.Count == 0) foreach (string sn in SetNames) wanted.Add(sn);
             var pos = new Dictionary<long, int>();
             for (int k = 0; k < keep.Count; k++) pos[T[keep[k]]] = k;
             int K = keep.Count;
@@ -352,14 +400,14 @@ namespace LifeOnAzeroth
                         var arrs = Arr(kv.Value);
                         if (arrs.Length < 3) continue;
                         long id = long.Parse(kv.Key, Inv);
-                        var outA = Align(arrs, st, pos, K);
+                        var outA = Trim(Align(arrs, st, pos, K), HT);
                         if (outA != null) local[id] = outA;
                         if (arrs.Length > 3)
                             foreach (var rkv in Obj(arrs[3]))
                             {
                                 int si;
-                                if (!int.TryParse(rkv.Key, out si) || si < 0 || si >= SetNames.Length) continue;
-                                var ra = Align(Arr(rkv.Value), st, pos, K);
+                                if (!int.TryParse(rkv.Key, out si) || si < 0 || si >= SetNames.Length || !wanted.Contains(SetNames[si])) continue;
+                                var ra = Trim(Align(Arr(rkv.Value), st, pos, K), HT);
                                 if (ra != null) localRs.Add(new KeyValuePair<string, KeyValuePair<long, long[][]>>(SetNames[si], new KeyValuePair<long, long[][]>(id, ra)));
                             }
                     }
@@ -419,7 +467,7 @@ namespace LifeOnAzeroth
                 sb.Append("[").Append(LuaStr(sn)).Append("] = {\n");
                 WriteState(sb, sst);
                 sb.Append("latS = ").Append(LuaStr(LatestLines(Obj(Field(sm, "latest"))))).Append(",\n");
-                WriteHist(sb, histRs[sn]);
+                if (wanted.Contains(sn)) WriteHist(sb, histRs[sn]); else sb.Append("hist = {},\nnohist = true,\n");
                 sb.Append("},\n");
             }
             sb.Append("},\n}\n");

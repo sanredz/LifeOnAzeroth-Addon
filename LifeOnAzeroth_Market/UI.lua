@@ -346,7 +346,7 @@ local function paintHeader()
   local d = D()
   local rn = NS.REGION_NAME[d.region] or string.upper(d.region or "")
   local V, rs = NS.view()
-  main.note:SetText(rn .. (rs and (" \194\183 " .. rs) or "") .. " \194\183 " .. #V.t .. " hourly snapshots")
+  main.note:SetText(rn .. (rs and (" \194\183 " .. rs) or "") .. (V.t[1] and (" \194\183 tracked since " .. date("%b %d", V.t[1])) or ""))
   main.fresh:SetText("Prices " .. NS.ago(d.built) .. " \194\183 " .. date("%b %d, %H:%M", d.built))
   local old = time() - (d.built or 0) > 3 * 3600
   local c = old and NS.COL.dn or NS.COL.muted
@@ -704,6 +704,11 @@ local function minimapButton()
 end
 
 function NS.OnLoad()
+  local mine = NS.detectRuleset()
+  if mine then
+    NS.db.rulesets = NS.db.rulesets or {}
+    NS.db.rulesets[mine] = time()
+  end
   if type(NS.db.series) == "table" then st.series = NS.db.series else NS.db.series = st.series end
   minimapButton()
 end

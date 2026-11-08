@@ -249,10 +249,17 @@ function NS.DrawItem()
   local function count(v) local n = 0 for i = 1, #v do if v[i] then n = n + 1 end end return n end
   if h and count(h.med) >= 2 then list[#list + 1] = { name = "Typical price", t = t, v = h.med, unit = "coin", color = qc } end
   if h and count(h.min) >= 2 then list[#list + 1] = { name = "Cheapest", t = t, v = h.min, unit = "coin", color = { 0.604, 0.639, 0.678 } } end
+  local V = NS.view()
   if cur.rg ~= LOA_DATA.region then
     list = {}
   end
-  c.chart:Draw(list, { span = span, abs = true, fill = true, emptyText = cur.rg ~= LOA_DATA.region and ("Price history is downloaded for " .. (NS.REGION_NAME[LOA_DATA.region] or "your region") .. " only. Pick another region in the companion app to see its history.") or nil })
+  local empty
+  if cur.rg ~= LOA_DATA.region then
+    empty = "Price history is downloaded for " .. (NS.REGION_NAME[LOA_DATA.region] or "your region") .. " only. Pick another region in the companion app to see its history."
+  elseif rs and V.nohist then
+    empty = "Price history for " .. rs .. " is only downloaded for rulesets you play. Log in on a " .. rs .. " character and it is added with the next update."
+  end
+  c.chart:Draw(list, { span = span, abs = true, fill = true, emptyText = empty })
   local vol = c.vol
   for _, b in ipairs(vol.bars) do b:Hide() end
   vol.peak:Hide()
@@ -260,7 +267,7 @@ function NS.DrawItem()
   local tmax = t[#t] or 0
   local pts = {}
   for i = 1, #q do
-    if t[i] and (span == 0 or t[i] >= tmax - span) then pts[#pts + 1] = q[i] or 0 end
+    if t[i] and t[i] >= tmax - (span == 0 and 30 * 86400 or math.min(span, 30 * 86400)) then pts[#pts + 1] = q[i] or 0 end
   end
   if #pts > 0 then
     local mx, pk = 1, 1
