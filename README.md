@@ -27,21 +27,6 @@ Windows may say the app is unrecognised the first time. Click **More info**, the
 
 ![The companion app](media/companion.png)
 
-## Folders
-
-| Folder | What it is |
-| --- | --- |
-| `LifeOnAzeroth_Market/` | The addon. |
-| `companion/` | The companion app (C#, .NET Framework 4, which ships with Windows 10 and 11). |
-
-## Building
-
-```
-python build.py
-```
-
-This builds `dist/LifeOnAzerothCompanion.exe` with the addon files packed inside, and `dist/LifeOnAzeroth_Market-<version>.zip` for addon sites. It only needs Python 3 and the C# compiler that comes with Windows. Pushing a `v*` tag builds both on GitHub and attaches them to a release.
-
 ## Slash commands
 
 | Command | Does |
