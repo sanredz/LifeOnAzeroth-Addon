@@ -99,44 +99,81 @@ function NS.Ensure()
       end
     end
   end
-  D.lat = {}
-  for rg, s in pairs(D.latS or {}) do
+  local function parseLat(s)
     local L = {}
-    for line in string.gmatch(s .. "\n", "([^\n]*)\n") do
+    for line in string.gmatch((s or "") .. "\n", "([^\n]*)\n") do
       if line ~= "" then
         local f = splitFields(line, ",")
         local id = tonumber(f[1])
         if id then L[id] = { tonumber(f[2]) or 0, tonumber(f[3]) or 0, tonumber(f[4]) or 0, tonumber(f[5]) or 0, tonumber(f[6]) } end
       end
     end
-    D.lat[rg] = L
+    return L
+  end
+  D.lat = {}
+  for rg, s in pairs(D.latS or {}) do D.lat[rg] = parseLat(s) end
+  for _, R in pairs(D.rs or {}) do
+    R.lat = parseLat(R.latS)
+    R.latS = nil
   end
   D.catS, D.latS = nil, nil
   D.ready = true
   return D
 end
 
+NS.RULESETS = { "PvP", "Normal", "Roleplay", "Roleplay PvP" }
+NS.RULESET_SHORT = { PvP = "PvP", Normal = "Normal", Roleplay = "RP", ["Roleplay PvP"] = "RP-PvP" }
+
+function NS.detectRuleset()
+  local ok, name = pcall(GetRealmName)
+  name = ok and type(name) == "string" and string.lower(name) or ""
+  if name == "" then return nil end
+  if string.find(name, "rppvp", 1, true) or string.find(name, "rp-pvp", 1, true) or string.find(name, "rp pvp", 1, true) then return "Roleplay PvP" end
+  if string.find(name, "pvp", 1, true) then return "PvP" end
+  if string.find(name, "rp", 1, true) or string.find(name, "roleplay", 1, true) then return "Roleplay" end
+  return "Normal"
+end
+
+function NS.ruleset()
+  local D = LOA_DATA
+  if not D or not D.rs then return nil end
+  local pick = NS.db and NS.db.rs
+  if pick == "all" then return nil end
+  if pick == nil or pick == "auto" then pick = NS.detectRuleset() end
+  if pick and D.rs[pick] and D.rs[pick].t and #D.rs[pick].t >= 2 then return pick end
+  return nil
+end
+
+function NS.view()
+  local D = LOA_DATA
+  local rs = NS.ruleset()
+  if rs then return D.rs[rs], rs end
+  return D, nil
+end
+
 local idxCache = {}
 function NS.idx(key)
-  local D = LOA_DATA
-  if not D or not D.idx or not D.idx[key] then return nil end
-  local c = idxCache[key]
-  if c and c.src == D.idx[key] then return c.v end
-  local v = NS.decodeNums(D.idx[key], 10)
-  idxCache[key] = { src = D.idx[key], v = v }
+  local V, rs = NS.view()
+  if not V or not V.idx or not V.idx[key] then return nil end
+  local ck = (rs or "") .. "|" .. key
+  local c = idxCache[ck]
+  if c and c.src == V.idx[key] then return c.v end
+  local v = NS.decodeNums(V.idx[key], 10)
+  idxCache[ck] = { src = V.idx[key], v = v }
   return v
 end
 
 local histCache = {}
 function NS.hist(id)
-  local D = LOA_DATA
-  local s = D and D.hist and D.hist[id]
+  local V, rs = NS.view()
+  local s = V and V.hist and V.hist[id]
   if not s then return nil end
-  local c = histCache[id]
+  local ck = (rs or "") .. "|" .. id
+  local c = histCache[ck]
   if c and c.src == s then return c.h end
   local parts = splitFields(s, ";")
   local h = { med = NS.decodeNums(parts[1] or "", 36), min = NS.decodeNums(parts[2] or "", 36), qty = NS.decodeNums(parts[3] or "", 36) }
-  histCache[id] = { src = s, h = h }
+  histCache[ck] = { src = s, h = h }
   return h
 end
 
@@ -175,6 +212,17 @@ function NS.iconPath(name)
 end
 
 function NS.latest(rg, id)
+  local D = LOA_DATA
+  if not D then return nil end
+  if rg == D.region then
+    local V = NS.view()
+    return V.lat and V.lat[id]
+  end
+  local L = D.lat and D.lat[rg]
+  return L and L[id]
+end
+
+function NS.latestAll(rg, id)
   local L = LOA_DATA and LOA_DATA.lat and LOA_DATA.lat[rg]
   return L and L[id]
 end

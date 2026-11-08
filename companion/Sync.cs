@@ -101,6 +101,90 @@ namespace LifeOnAzeroth
             return Math.Round(v, 2).ToString("0.##", Inv);
         }
 
+        static readonly string[] SetNames = { "PvP", "Normal", "Roleplay", "Roleplay PvP" };
+        static readonly string[] SetSlugs = { "pvp", "normal", "roleplay", "roleplay-pvp" };
+
+        static long[][] Align(object[] arrs, long[] st, Dictionary<long, int> pos, int K)
+        {
+            if (arrs.Length < 3) return null;
+            var med = Arr(arrs[0]); var mn = Arr(arrs[1]); var q = Arr(arrs[2]);
+            var outA = new long[3][] { new long[K], new long[K], new long[K] };
+            bool any = false;
+            for (int j = 0; j < st.Length && j < med.Length; j++)
+            {
+                int p;
+                if (!pos.TryGetValue(st[j], out p)) continue;
+                outA[0][p] = Lng(med[j]);
+                outA[1][p] = j < mn.Length ? Lng(mn[j]) : 0;
+                outA[2][p] = j < q.Length ? Lng(q[j]) : 0;
+                if (outA[0][p] > 0) any = true;
+            }
+            return any ? outA : null;
+        }
+
+        static void WriteState(StringBuilder sb, Dictionary<string, object> state)
+        {
+            sb.Append("t = {").Append(string.Join(",", Arr(Field(state, "t")).Select(x => Lng(x).ToString(Inv)))).Append("},\n");
+            sb.Append("idx = {\n");
+            foreach (var kv in Obj(Field(state, "idx")))
+            {
+                var vals = Arr(kv.Value).Select(x => x == null ? "" : Dec(Num(x)));
+                sb.Append("[").Append(LuaStr(kv.Key)).Append("] = ").Append(LuaStr(string.Join(",", vals))).Append(",\n");
+            }
+            sb.Append("},\ncounts = {\n");
+            foreach (var kv in Obj(Field(state, "counts")))
+                sb.Append("[").Append(LuaStr(kv.Key)).Append("] = ").Append(Lng(kv.Value)).Append(",\n");
+            sb.Append("},\n");
+        }
+
+        static string LatestLines(Dictionary<string, object> lat)
+        {
+            var lines = new StringBuilder();
+            foreach (var kv in lat)
+            {
+                var l = Arr(kv.Value);
+                if (l.Length < 4) continue;
+                lines.Append(kv.Key).Append(',').Append(Lng(l[0])).Append(',').Append(Lng(l[1])).Append(',').Append(Lng(l[2])).Append(',').Append(Lng(l[3])).Append(',');
+                if (l.Length > 4 && l[4] != null) lines.Append(Dec(Num(l[4])));
+                lines.Append('\n');
+            }
+            return lines.ToString();
+        }
+
+        static void WriteHist(StringBuilder sb, SortedDictionary<long, long[][]> hist)
+        {
+            sb.Append("hist = {\n");
+            foreach (var kv in hist)
+            {
+                sb.Append("[").Append(kv.Key).Append("] = \"");
+                for (int s = 0; s < 3; s++)
+                {
+                    if (s > 0) sb.Append(';');
+                    var a = kv.Value[s];
+                    for (int i = 0; i < a.Length; i++) { if (i > 0) sb.Append(','); sb.Append(B36(a[i])); }
+                }
+                sb.Append("\",\n");
+            }
+            sb.Append("},\n");
+        }
+
+        const int Format = 2;
+
+        static int DataFormat(string file)
+        {
+            try
+            {
+                using (var r = new StreamReader(file))
+                {
+                    var buf = new char[64];
+                    int n = r.Read(buf, 0, 64);
+                    var m = System.Text.RegularExpressions.Regex.Match(new string(buf, 0, n), @"v = (\d+)");
+                    return m.Success ? int.Parse(m.Groups[1].Value) : 0;
+                }
+            }
+            catch { return 0; }
+        }
+
         public static string AddonDir(string forever)
         {
             return Path.Combine(forever, "Interface", "AddOns", AddonName);
@@ -215,7 +299,7 @@ namespace LifeOnAzeroth
             if (T.Length == 0) throw new Exception("No market data for this region yet.");
             long latest = T[T.Length - 1];
             string dataFile = Path.Combine(DataDir(forever), "Data.lua");
-            if (latest == lastLatest && File.Exists(dataFile) && new FileInfo(dataFile).Length > 1000)
+            if (latest == lastLatest && File.Exists(dataFile) && new FileInfo(dataFile).Length > 1000 && DataFormat(dataFile) == Format)
                 return new SyncResult { Changed = false, Latest = latest, Snapshots = T.Length };
 
             progress("Downloading the item catalog", 0.06);
@@ -226,6 +310,12 @@ namespace LifeOnAzeroth
                 if (r == region) continue;
                 progress("Downloading prices in other regions", 0.1 + 0.03 * done++);
                 try { markets[r] = Obj(Json(Get("/market/" + r))); } catch { }
+            }
+            var sets = new Dictionary<string, Dictionary<string, object>>();
+            for (int si = 0; si < SetNames.Length; si++)
+            {
+                progress("Downloading ruleset prices", 0.19 + 0.01 * si);
+                try { sets[SetNames[si]] = Obj(Json(Get("/market/" + region + "/rs/" + SetSlugs[si]))); } catch { }
             }
 
             var keep = new List<int>();
@@ -243,6 +333,8 @@ namespace LifeOnAzeroth
             int K = keep.Count;
 
             var hist = new SortedDictionary<long, long[][]>();
+            var histRs = new Dictionary<string, SortedDictionary<long, long[][]>>();
+            foreach (string sn in SetNames) histRs[sn] = new SortedDictionary<long, long[][]>();
             int shardsDone = 0;
             var lockObj = new object();
             Exception shardErr = null;
@@ -254,27 +346,27 @@ namespace LifeOnAzeroth
                     var st = Arr(Field(d, "t")).Select(Lng).ToArray();
                     var items = Obj(Field(d, "i"));
                     var local = new Dictionary<long, long[][]>();
+                    var localRs = new List<KeyValuePair<string, KeyValuePair<long, long[][]>>>();
                     foreach (var kv in items)
                     {
                         var arrs = Arr(kv.Value);
                         if (arrs.Length < 3) continue;
-                        var med = Arr(arrs[0]); var mn = Arr(arrs[1]); var q = Arr(arrs[2]);
-                        var outA = new long[3][] { new long[K], new long[K], new long[K] };
-                        bool any = false;
-                        for (int j = 0; j < st.Length && j < med.Length; j++)
-                        {
-                            int p;
-                            if (!pos.TryGetValue(st[j], out p)) continue;
-                            outA[0][p] = Lng(med[j]);
-                            outA[1][p] = j < mn.Length ? Lng(mn[j]) : 0;
-                            outA[2][p] = j < q.Length ? Lng(q[j]) : 0;
-                            if (outA[0][p] > 0) any = true;
-                        }
-                        if (any) local[long.Parse(kv.Key, Inv)] = outA;
+                        long id = long.Parse(kv.Key, Inv);
+                        var outA = Align(arrs, st, pos, K);
+                        if (outA != null) local[id] = outA;
+                        if (arrs.Length > 3)
+                            foreach (var rkv in Obj(arrs[3]))
+                            {
+                                int si;
+                                if (!int.TryParse(rkv.Key, out si) || si < 0 || si >= SetNames.Length) continue;
+                                var ra = Align(Arr(rkv.Value), st, pos, K);
+                                if (ra != null) localRs.Add(new KeyValuePair<string, KeyValuePair<long, long[][]>>(SetNames[si], new KeyValuePair<long, long[][]>(id, ra)));
+                            }
                     }
                     lock (lockObj)
                     {
                         foreach (var kv in local) hist[kv.Key] = kv.Value;
+                        foreach (var kv in localRs) histRs[kv.Key][kv.Value.Key] = kv.Value.Value;
                         shardsDone++;
                         progress("Downloading price history", 0.22 + 0.7 * shardsDone / 64.0);
                     }
@@ -286,7 +378,7 @@ namespace LifeOnAzeroth
             progress("Writing the addon data", 0.95);
             var sb = new StringBuilder(4 << 20);
             long built = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
-            sb.Append("LOA_DATA = {\nv = 1,\nbuilt = ").Append(built).Append(",\nlatest = ").Append(latest).Append(",\nregion = ").Append(LuaStr(region)).Append(",\n");
+            sb.Append("LOA_DATA = {\nv = ").Append(Format).Append(",\nbuilt = ").Append(built).Append(",\nlatest = ").Append(latest).Append(",\nregion = ").Append(LuaStr(region)).Append(",\n");
             sb.Append("defs = {\n");
             foreach (var o in Arr(Field(own, "defs")))
             {
@@ -295,18 +387,9 @@ namespace LifeOnAzeroth
                   .Append(",").Append(LuaStr(Convert.ToString(Field(d, "g")))).Append(",").Append(LuaStr(Convert.ToString(Field(d, "ic"))))
                   .Append(",").Append(LuaStr(Convert.ToString(Field(d, "d")) ?? "")).Append("},\n");
             }
-            sb.Append("},\nt = {");
-            sb.Append(string.Join(",", T.Select(x => x.ToString(Inv)))).Append("},\n");
-            sb.Append("idx = {\n");
-            foreach (var kv in Obj(Field(state, "idx")))
-            {
-                var vals = Arr(kv.Value).Select(x => x == null ? "" : Dec(Num(x)));
-                sb.Append("[").Append(LuaStr(kv.Key)).Append("] = ").Append(LuaStr(string.Join(",", vals))).Append(",\n");
-            }
-            sb.Append("},\ncounts = {\n");
-            foreach (var kv in Obj(Field(state, "counts")))
-                sb.Append("[").Append(LuaStr(kv.Key)).Append("] = ").Append(Lng(kv.Value)).Append(",\n");
-            sb.Append("},\nht = {").Append(string.Join(",", keep.Select(i => T[i].ToString(Inv)))).Append("},\n");
+            sb.Append("},\n");
+            WriteState(sb, state);
+            sb.Append("ht = {").Append(string.Join(",", keep.Select(i => T[i].ToString(Inv)))).Append("},\n");
 
             var catLines = new StringBuilder();
             int itemCount = 0;
@@ -323,30 +406,21 @@ namespace LifeOnAzeroth
             sb.Append("catS = ").Append(LuaStr(catLines.ToString())).Append(",\n");
             sb.Append("latS = {\n");
             foreach (var mk in markets)
+                sb.Append(mk.Key).Append(" = ").Append(LuaStr(LatestLines(Obj(Field(mk.Value, "latest"))))).Append(",\n");
+            sb.Append("},\n");
+            WriteHist(sb, hist);
+            sb.Append("rs = {\n");
+            foreach (string sn in SetNames)
             {
-                var lat = Obj(Field(mk.Value, "latest"));
-                var lines = new StringBuilder();
-                foreach (var kv in lat)
-                {
-                    var l = Arr(kv.Value);
-                    if (l.Length < 4) continue;
-                    lines.Append(kv.Key).Append(',').Append(Lng(l[0])).Append(',').Append(Lng(l[1])).Append(',').Append(Lng(l[2])).Append(',').Append(Lng(l[3])).Append(',');
-                    if (l.Length > 4 && l[4] != null) lines.Append(Dec(Num(l[4])));
-                    lines.Append('\n');
-                }
-                sb.Append(mk.Key).Append(" = ").Append(LuaStr(lines.ToString())).Append(",\n");
-            }
-            sb.Append("},\nhist = {\n");
-            foreach (var kv in hist)
-            {
-                sb.Append("[").Append(kv.Key).Append("] = \"");
-                for (int s = 0; s < 3; s++)
-                {
-                    if (s > 0) sb.Append(';');
-                    var a = kv.Value[s];
-                    for (int i = 0; i < a.Length; i++) { if (i > 0) sb.Append(','); sb.Append(B36(a[i])); }
-                }
-                sb.Append("\",\n");
+                Dictionary<string, object> sm;
+                if (!sets.TryGetValue(sn, out sm)) continue;
+                var sst = Obj(Field(sm, "state"));
+                if (Arr(Field(sst, "t")).Length == 0) continue;
+                sb.Append("[").Append(LuaStr(sn)).Append("] = {\n");
+                WriteState(sb, sst);
+                sb.Append("latS = ").Append(LuaStr(LatestLines(Obj(Field(sm, "latest"))))).Append(",\n");
+                WriteHist(sb, histRs[sn]);
+                sb.Append("},\n");
             }
             sb.Append("},\n}\n");
 

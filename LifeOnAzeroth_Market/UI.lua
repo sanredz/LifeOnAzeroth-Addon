@@ -13,7 +13,7 @@ function NS.seriesData(s)
   local d = D()
   if s.kind == "idx" then
     local def = NS.def(s.key)
-    return { name = def and def[2] or s.key, t = d.t, v = NS.idx(s.key) or {}, unit = "idx", icon = def and NS.iconPath(def[4]) }
+    return { name = def and def[2] or s.key, t = NS.view().t, v = NS.idx(s.key) or {}, unit = "idx", icon = def and NS.iconPath(def[4]) }
   end
   local h = NS.hist(s.id)
   return { name = NS.itemName(s.id), t = d.ht, v = h and h.med or {}, unit = "coin", icon = NS.itemIcon(s.id) }
@@ -188,7 +188,8 @@ local function indexRow(side, i)
       GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
       GameTooltip:AddLine(self.def[2], NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
       if self.def[5] and self.def[5] ~= "" then GameTooltip:AddLine(self.def[5], NS.COL.ink2[1], NS.COL.ink2[2], NS.COL.ink2[3], true) end
-      local cnt = LOA_DATA.counts and LOA_DATA.counts[self.def[1]]
+      local V = NS.view()
+      local cnt = V.counts and V.counts[self.def[1]]
       if cnt then GameTooltip:AddLine(NS.fmt(cnt) .. " items.", NS.COL.muted[1], NS.COL.muted[2], NS.COL.muted[3]) end
       GameTooltip:AddLine("Click to add to the chart.", 0.6, 0.6, 0.6)
       GameTooltip:Show()
@@ -241,7 +242,7 @@ local function paintSide()
       r.nm:SetText(NS.shortName(def[2]))
       local _, lv = NS.lastVal(v)
       r.vl:SetText(lv and string.format("%.1f", lv) or "\226\128\147")
-      r.ch:SetText(NS.pctColored(NS.change(d.t, v, span)))
+      r.ch:SetText(NS.pctColored(NS.change(NS.view().t, v, span)))
       spark(r, v)
     end
   end
@@ -344,7 +345,8 @@ end
 local function paintHeader()
   local d = D()
   local rn = NS.REGION_NAME[d.region] or string.upper(d.region or "")
-  main.note:SetText(rn .. " \194\183 " .. #d.t .. " hourly snapshots")
+  local V, rs = NS.view()
+  main.note:SetText(rn .. (rs and (" \194\183 " .. rs) or "") .. " \194\183 " .. #V.t .. " hourly snapshots")
   main.fresh:SetText("Prices " .. NS.ago(d.built) .. " \194\183 " .. date("%b %d, %H:%M", d.built))
   local old = time() - (d.built or 0) > 3 * 3600
   local c = old and NS.COL.dn or NS.COL.muted
@@ -364,6 +366,15 @@ function NS.Refresh()
   main.emptyState:Hide()
   main.body:Show()
   main.ranges:Select(NS.db.range)
+  local d = D()
+  main.rsSeg:Select(NS.ruleset() or "all")
+  for _, b in ipairs(main.rsSeg.buttons) do
+    local ok = b.key == "all" or (d.rs and d.rs[b.key] and d.rs[b.key].t and #d.rs[b.key].t >= 2)
+    b:SetEnabled(ok and true or false)
+    b:SetAlpha(ok and 1 or 0.4)
+    b.mine = b.key == NS.detectRuleset()
+    b.label:SetText(b.text .. (b.mine and " \226\128\162" or ""))
+  end
   paintHeader()
   paintSide()
   paintChart()
@@ -385,7 +396,7 @@ local function searchHits(q)
     if ok then
       local rank = n == ql and 0 or string.sub(n, 1, #ql) == ql and 1 or (string.find(" " .. n, " " .. words[1], 1, true) and 2) or 3
       local l = NS.latest(d.region, id)
-      hits[#hits + 1] = { id, c, l, rank, l and l[4] or 0 }
+      if l or not NS.ruleset() then hits[#hits + 1] = { id, c, l, rank, l and l[4] or 0 } end
     end
   end
   table.sort(hits, function(a, b) if a[4] ~= b[4] then return a[4] < b[4] end if a[5] ~= b[5] then return a[5] > b[5] end return a[2][1] < b[2][1] end)
@@ -581,6 +592,27 @@ local function build()
   f.body = body
   buildSearch(body)
   main = f
+  local keys = { "all", "PvP", "Normal", "Roleplay", "Roleplay PvP" }
+  f.rsSeg = NS.segmented(body, keys, function(k)
+    NS.db.rs = (k == NS.detectRuleset()) and "auto" or k
+    if NS.CloseItem then NS.CloseItem() end
+    NS.Refresh()
+  end, 82)
+  f.rsSeg:SetPoint("LEFT", body.search, "RIGHT", 14, 0)
+  local labels = { all = "All rulesets", PvP = "PvP", Normal = "Normal", Roleplay = "RP", ["Roleplay PvP"] = "RP-PvP" }
+  for _, b in ipairs(f.rsSeg.buttons) do
+    b.text = labels[b.key]
+    b.label:SetText(b.text)
+    b:HookScript("OnEnter", function(self)
+      GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+      GameTooltip:AddLine(self.key == "all" and "Every ruleset" or self.key, NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
+      GameTooltip:AddLine(self.key == "all" and "Prices from every auction house in your region." or ("Only auctions on " .. self.key .. " realms."), 1, 1, 1, true)
+      if self.mine then GameTooltip:AddLine("Your character's ruleset.", NS.COL.up[1], NS.COL.up[2], NS.COL.up[3]) end
+      if not self:IsEnabled() then GameTooltip:AddLine("No data for this ruleset yet.", NS.COL.dn[1], NS.COL.dn[2], NS.COL.dn[3]) end
+      GameTooltip:Show()
+    end)
+    b:HookScript("OnLeave", function() GameTooltip:Hide() end)
+  end
   f.side = buildSide(body)
   local right = CreateFrame("Frame", nil, body)
   right:SetPoint("TOPLEFT", f.side, "TOPRIGHT", 18, 0)

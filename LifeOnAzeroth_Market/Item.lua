@@ -244,6 +244,7 @@ function NS.DrawItem()
   c.ranges:Select(NS.db.range)
   c.k1:SetColorTexture(qc[1], qc[2], qc[3], 1)
   local t = LOA_DATA.ht or {}
+  local _, rs = NS.view()
   local list = {}
   local function count(v) local n = 0 for i = 1, #v do if v[i] then n = n + 1 end end return n end
   if h and count(h.med) >= 2 then list[#list + 1] = { name = "Typical price", t = t, v = h.med, unit = "coin", color = qc } end
@@ -314,7 +315,9 @@ function NS.OpenItem(id, rg)
     end
   end
   local l = NS.latest(rg, id)
-  c.pxLabel:SetText("Typical price \194\183 " .. (NS.REGION_NAME[rg] or rg))
+  local _, rsName = NS.view()
+  c.pxLabel:SetText("Typical price \194\183 " .. (NS.REGION_NAME[rg] or rg) .. (rsName and rg == LOA_DATA.region and (" \194\183 " .. rsName) or ""))
+  c.regs.title:SetText(rsName and "Price in each region  " .. NS.color(NS.COL.muted, "every ruleset") or "Price in each region")
   c.px:SetText(l and NS.coin(l[1]) or NS.color(NS.COL.muted, "Not listed right now"))
   c.pill:SetText(l and l[5] and (NS.pctColored(l[5]) .. NS.color(NS.COL.muted, "  24h")) or "")
   c.add:SetShown(rg == LOA_DATA.region and NS.hist(id) ~= nil)
@@ -324,8 +327,9 @@ function NS.OpenItem(id, rg)
   c.stats[4].v:SetText(cat[7] and cat[7] > 0 and NS.coin(cat[7]) or "\226\128\147")
 
   local priced, minP, minN, lowRg = {}, math.huge, 0, nil
+  local lAll = NS.latestAll(rg, id)
   for _, r in ipairs(NS.REGIONS) do
-    local v = NS.latest(r, id)
+    local v = NS.latestAll(r, id)
     if v and v[1] > 0 then
       priced[#priced + 1] = r
       if v[1] < minP then minP, minN, lowRg = v[1], 1, r elseif v[1] == minP then minN = minN + 1 end
@@ -337,7 +341,7 @@ function NS.OpenItem(id, rg)
     if LOA_DATA.lat[r] then
       i = i + 1
       local row = c.regs.rows[i]
-      local v = NS.latest(r, id)
+      local v = NS.latestAll(r, id)
       row.rg = r
       row.cur = r == rg
       row.bg:SetColorTexture(0.973, 0.827, 0.42, row.cur and 0.1 or 0)
@@ -347,8 +351,8 @@ function NS.OpenItem(id, rg)
       if r == rg then
         row.sub:SetText("viewing")
         row.sub:SetTextColor(NS.COL.muted[1], NS.COL.muted[2], NS.COL.muted[3])
-      elseif v and l and l[1] > 0 then
-        local d = 100 * (v[1] / l[1] - 1)
+      elseif v and lAll and lAll[1] > 0 then
+        local d = 100 * (v[1] / lAll[1] - 1)
         local col = d < 0 and NS.COL.up or d > 0 and NS.COL.dn or NS.COL.muted
         row.sub:SetText(NS.pctText(d) .. " vs " .. string.upper(rg))
         row.sub:SetTextColor(col[1], col[2], col[3])
@@ -360,7 +364,7 @@ function NS.OpenItem(id, rg)
   end
   for j = i + 1, 4 do c.regs.rows[j]:Hide() end
 
-  local L = LOA_DATA.lat[rg] or {}
+  local L = (rg == LOA_DATA.region and NS.view().lat) or LOA_DATA.lat[rg] or {}
   local kin = {}
   for oid, oc in pairs(LOA_DATA.cat) do
     if oid ~= id and oc[4] == cat[4] and oc[5] == cat[5] and L[oid] then
