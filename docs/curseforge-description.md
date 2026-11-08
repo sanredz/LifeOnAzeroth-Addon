@@ -17,7 +17,7 @@ The auction house market from [lifeonazeroth.com](https://lifeonazeroth.com/#eco
 
 Is Iron Ore cheap right now, or did everyone just undercut each other this morning? Are herbs climbing all week? Is that green sword worth listing, or will it sit there for two days? Open the Market and you'll know before you post.
 
-Every auction house in every region is read once an hour, so you're looking at real prices and real history, not a guess from the last time you checked the AH. The last three days are kept hour by hour; older history is kept at a coarser step so the data stays small.
+**Prices update every hour.** Every auction house in every region is read once an hour, so you're looking at real prices and real history, not a guess from the last time you checked the AH. The last three days are kept hour by hour, and older history is kept at a coarser step so the data stays small.
 
 > **Found a bug?** If something looks off, please [open an issue](https://github.com/sanredz/LifeOnAzeroth-Addon/issues).
 
@@ -26,7 +26,7 @@ Every auction house in every region is read once an hour, so you're looking at r
 ## The Market
 
 - **Indexes** work like a stock index. Each one follows a group of items from the day tracking began, starting at 100: the whole market, trade goods, ore and bars, cloth, herbs, potions, green gear by level and more. 70 means prices are about 30% lower than when it started.
-- **Trends at a glance:** every index has a small trend line and its change over whatever range you pick: the last 6 hours, a day, a week, a month or all time.
+- **Trends at a glance:** every index has a small trend line and its change over the time range you pick on the chart: the last 6 hours, a day, a week, a month or all time. The prices behind them update every hour.
 - **Compare up to five** indexes or items on one chart. Hover the chart to see every line's value at that hour.
 - **Search any item** seen on the auction house and get its typical price, cheapest listing and 24-hour change as you type.
 - **Your picks stay put.** The chart remembers what you were watching the next time you log in.
@@ -53,7 +53,7 @@ PvP, Normal, Roleplay and Roleplay PvP all have their own auction houses and the
 Addons can't go online, so a small companion app does that part.
 
 1. Download **LifeOnAzerothCompanion.exe** from the [latest release on GitHub](https://github.com/sanredz/LifeOnAzeroth-Addon/releases/latest) and run it. There's nothing to install.
-2. It finds your game folder and downloads fresh prices every hour into a small **Life on Azeroth: Data** addon. Keep that one enabled.
+2. It finds your game folder and downloads fresh prices **every hour** into a small **Life on Azeroth: Data** addon. Keep that one enabled.
 3. Type `/reload` in game, or **Shift-click** the coin by your minimap, and the newest prices are loaded.
 
 The app sits quietly in the tray, can start with Windows and never pops up while you play. Windows may say it's unrecognised the first time: click **More info**, then **Run anyway**.
