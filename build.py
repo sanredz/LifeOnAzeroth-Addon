@@ -25,6 +25,8 @@ def build_app():
     out = os.path.join(DIST, 'LifeOnAzerothCompanion.exe')
     res = ['/resource:%s,app.ico' % os.path.join(APP, 'app.ico'), '/resource:%s,logo96.png' % os.path.join(APP, 'logo96.png')]
     for f in sorted(os.listdir(ADDON)):
+        if f.startswith('.'):
+            continue
         res.append('/resource:%s,addon/%s' % (os.path.join(ADDON, f), f))
     cmd = [csc(), '/nologo', '/target:winexe', '/optimize+', '/platform:anycpu', '/out:' + out,
            '/win32icon:' + os.path.join(APP, 'app.ico'), '/win32manifest:' + os.path.join(APP, 'app.manifest'),
@@ -40,6 +42,8 @@ def build_zip(ver):
     out = os.path.join(DIST, '%s-%s.zip' % (NAME, ver))
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
         for f in sorted(os.listdir(ADDON)):
+            if f.startswith('.'):
+                continue
             z.write(os.path.join(ADDON, f), NAME + '/' + f)
     return out
 
