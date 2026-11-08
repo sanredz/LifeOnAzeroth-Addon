@@ -9,6 +9,10 @@ The auction house market from [lifeonazeroth.com](https://lifeonazeroth.com/#eco
 
 Open it with `/market` or the coin by your minimap.
 
+![The Market: indexes on the left and a chart comparing them](media/market.png)
+
+![An item page with price history and prices in every region](media/item.png)
+
 ## How prices get into the game
 
 Addons cannot go online, so a small companion app does that part.
@@ -20,6 +24,8 @@ Addons cannot go online, so a small companion app does that part.
 The app can start with Windows and keeps running in the tray when you close it. Right-click the tray icon to quit.
 
 Windows may say the app is unrecognised the first time. Click **More info**, then **Run anyway**.
+
+![The companion app](media/companion.png)
 
 ## Folders
 

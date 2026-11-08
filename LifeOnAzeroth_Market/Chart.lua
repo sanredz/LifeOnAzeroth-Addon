@@ -208,15 +208,19 @@ function Chart:Draw(list, opts)
         for i = 1, #draw - 1 do
           local x1, x2 = X(draw[i][1]), X(draw[i + 1][1])
           local y1, y2 = Y(draw[i][2]), Y(draw[i + 1][2])
-          local n = math.max(1, math.ceil((x2 - x1) / 3))
-          local sw = (x2 - x1) / n
+          local a, b = math.floor(x1 + 0.5), math.floor(x2 + 0.5)
+          local n = math.max(1, math.ceil((b - a) / 3))
           for j = 0, n - 1 do
-            local y = y1 + (y2 - y1) * (j + 0.5) / n
-            local tex = pool(self, "fill")
-            tex:ClearAllPoints()
-            tex:SetPoint("BOTTOMLEFT", self.canvas, "BOTTOMLEFT", x1 + j * sw, P.b)
-            tex:SetSize(math.max(1, sw + 0.5), math.max(1, y - P.b))
-            tex:SetGradient("VERTICAL", bottom, top)
+            local sa = a + math.floor((b - a) * j / n + 0.5)
+            local sb = a + math.floor((b - a) * (j + 1) / n + 0.5)
+            if sb > sa then
+              local y = y1 + (y2 - y1) * ((sa + sb) / 2 - x1) / math.max(1, x2 - x1)
+              local tex = pool(self, "fill")
+              tex:ClearAllPoints()
+              tex:SetPoint("BOTTOMLEFT", self.canvas, "BOTTOMLEFT", sa, P.b)
+              tex:SetSize(sb - sa, math.max(1, y - P.b))
+              tex:SetGradient("VERTICAL", bottom, top)
+            end
           end
         end
       end

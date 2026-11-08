@@ -43,7 +43,7 @@ namespace LifeOnAzeroth
             {
                 if (!fresh)
                 {
-                    PostMessage((IntPtr)0xffff, ShowMsg, IntPtr.Zero, IntPtr.Zero);
+                    if (!args.Contains("--tray")) PostMessage((IntPtr)0xffff, ShowMsg, IntPtr.Zero, IntPtr.Zero);
                     return;
                 }
                 Application.EnableVisualStyles();
@@ -472,7 +472,7 @@ namespace LifeOnAzeroth
 
         protected override void SetVisibleCore(bool value)
         {
-            if (startHidden && !IsHandleCreated) { CreateHandle(); value = false; }
+            if (startHidden) { if (!IsHandleCreated) CreateHandle(); value = false; }
             base.SetVisibleCore(value);
         }
 

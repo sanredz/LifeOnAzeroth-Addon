@@ -21,7 +21,7 @@ Every auction house in every region is read once an hour, so you're looking at r
 
 > **Found a bug?** If something looks off, please [open an issue](https://github.com/sanredz/LifeOnAzeroth-Addon/issues).
 
-![The Market with indexes on the left and a chart comparing them](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/market.png)
+![The Market: indexes on the left, a chart comparing them, and the hover tooltip](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/market.png)
 
 ## The Market
 
@@ -30,8 +30,6 @@ Every auction house in every region is read once an hour, so you're looking at r
 - **Compare up to five** indexes or items on one chart. Hover the chart to see every line's value at that hour.
 - **Search any item** seen on the auction house and get its typical price, cheapest listing and 24-hour change as you type.
 - **Your picks stay put.** The chart remembers what you were watching the next time you log in.
-
-![Comparing items on the chart](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/compare.png)
 
 ## Every item has its own page
 
