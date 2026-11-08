@@ -92,7 +92,7 @@ end
 local function toggleIndex(key)
   local at = seriesIndex("idx", key)
   if at then
-    if #st.series > 1 then table.remove(st.series, at) end
+    table.remove(st.series, at)
   else
     NS.AddSeries({ kind = "idx", key = key })
     return
@@ -287,6 +287,10 @@ local function paintChart()
   local area = main.right
   local d = D()
   local span = NS.rangeSpan(NS.db.range)
+  for i = #st.series, 1, -1 do
+    local s = st.series[i]
+    if (s.kind == "idx" and not NS.idx(s.key)) or (s.kind == "item" and not d.cat[s.id]) or (s.kind ~= "idx" and s.kind ~= "item") then table.remove(st.series, i) end
+  end
   local list = {}
   for k, s in ipairs(st.series) do
     local x = NS.seriesData(s)
@@ -314,9 +318,7 @@ local function paintChart()
     c.nm:SetText(s.name)
     c.ch:SetText(NS.pctColored(NS.change(s.t, s.v, span)))
     c.x.idx = k
-    local multi = #list > 1
-    c.x:SetShown(multi)
-    local w = 46 + c.nm:GetStringWidth() + 8 + c.ch:GetStringWidth() + (multi and 26 or 10)
+    local w = 46 + c.nm:GetStringWidth() + 8 + c.ch:GetStringWidth() + 26
     c:SetWidth(w)
     if x > 0 and x + w > maxW then x, y = 0, y + 32 end
     c:ClearAllPoints()
@@ -335,7 +337,8 @@ local function paintChart()
   area.chart:SetPoint("TOPLEFT", area, "TOPLEFT", 0, -y - 40)
   area.foot:SetText(#list > 1 and "Compared as % change from the start of the range." or "Index value; every index starts at 100 when its history begins.")
   if #list == 1 and st.series[1].kind == "item" then area.foot:SetText("Typical price each hour.") end
-  area.chart:Draw(list, { span = span })
+  if #list == 0 then area.foot:SetText("") end
+  area.chart:Draw(list, { span = span, emptyText = #list == 0 and "Nothing on the chart. Click an index on the left, or search an item, to add it." or nil })
 end
 
 local function paintHeader()
@@ -666,6 +669,7 @@ local function minimapButton()
 end
 
 function NS.OnLoad()
+  if type(NS.db.series) == "table" then st.series = NS.db.series else NS.db.series = st.series end
   minimapButton()
 end
 

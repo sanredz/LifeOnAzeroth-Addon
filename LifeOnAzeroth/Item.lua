@@ -368,8 +368,10 @@ function NS.OpenItem(id, rg)
     end
   end
   table.sort(kin, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[1] < b[1] end)
+  card:Show()
+  local fit = math.max(1, math.floor((c.kin:GetHeight() - 38) / 31))
   for j, row in ipairs(c.kin.rows) do
-    local k = kin[j]
+    local k = j <= fit and kin[j]
     if k then
       row.id = k[1]
       row.ic.icon:SetTexture(NS.itemIcon(k[1]))
@@ -384,7 +386,6 @@ function NS.OpenItem(id, rg)
     end
   end
   c.kin.none:SetShown(#kin == 0)
-  card:Show()
   NS.DrawItem()
 end
 

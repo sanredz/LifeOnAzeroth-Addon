@@ -203,14 +203,21 @@ function Chart:Draw(list, opts)
       for i = 1, #pts, step do draw[#draw + 1] = pts[i] end
       if draw[#draw] ~= pts[#pts] then draw[#draw + 1] = pts[#pts] end
       if #S == 1 or (opts.fill and k == 1) then
+        local top = CreateColor(c[1], c[2], c[3], 0.3)
+        local bottom = CreateColor(c[1], c[2], c[3], 0)
         for i = 1, #draw - 1 do
           local x1, x2 = X(draw[i][1]), X(draw[i + 1][1])
-          local y = (Y(draw[i][2]) + Y(draw[i + 1][2])) / 2
-          local tex = pool(self, "fill")
-          tex:ClearAllPoints()
-          tex:SetPoint("BOTTOMLEFT", self.canvas, "BOTTOMLEFT", x1, P.b)
-          tex:SetSize(math.max(1, x2 - x1), math.max(1, y - P.b))
-          tex:SetGradient("VERTICAL", CreateColor(c[1], c[2], c[3], 0), CreateColor(c[1], c[2], c[3], 0.3))
+          local y1, y2 = Y(draw[i][2]), Y(draw[i + 1][2])
+          local n = math.max(1, math.ceil((x2 - x1) / 3))
+          local sw = (x2 - x1) / n
+          for j = 0, n - 1 do
+            local y = y1 + (y2 - y1) * (j + 0.5) / n
+            local tex = pool(self, "fill")
+            tex:ClearAllPoints()
+            tex:SetPoint("BOTTOMLEFT", self.canvas, "BOTTOMLEFT", x1 + j * sw, P.b)
+            tex:SetSize(math.max(1, sw + 0.5), math.max(1, y - P.b))
+            tex:SetGradient("VERTICAL", bottom, top)
+          end
         end
       end
       for i = 1, #draw - 1 do
