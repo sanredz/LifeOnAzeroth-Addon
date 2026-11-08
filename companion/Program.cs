@@ -653,15 +653,12 @@ namespace LifeOnAzeroth
             nextCheck = DateTime.Now.AddMinutes(15);
             if (res.Changed)
             {
-                bool first = cfg.LastLatest == 0 && cfg.LastBuilt == 0;
                 cfg.LastBuilt = res.Built;
                 cfg.LastLatest = res.Latest;
                 cfg.Save();
                 if (freshInstall && Process.GetProcessesByName("Wow").Length > 0) SetStatus("Addon installed", "Restart WoW to load it, then type /market.", Theme.Up);
                 else SetStatus("New prices ready", "Type /reload in game to load them.", Theme.Up);
                 freshInstall = false;
-                if (!Visible && !first)
-                    tray.ShowBalloonTip(3000, "New auction house prices", RegionName[rg] + " prices from " + Local(res.Latest).ToString("HH:mm") + ". Type /reload in game to load them.", ToolTipIcon.None);
             }
             else
             {
