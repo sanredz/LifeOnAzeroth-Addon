@@ -248,7 +248,14 @@ function NS.DrawItem()
   local list = {}
   local function count(v) local n = 0 for i = 1, #v do if v[i] then n = n + 1 end end return n end
   if h and count(h.med) >= 2 then list[#list + 1] = { name = "Typical price", t = t, v = h.med, unit = "coin", color = qc } end
-  if h and count(h.min) >= 2 then list[#list + 1] = { name = "Cheapest", t = t, v = h.min, unit = "coin", color = { 0.604, 0.639, 0.678 } } end
+  local mins = {}
+  if h then
+    for i = 1, #h.min do
+      local mn, md = h.min[i], h.med[i]
+      mins[i] = (mn and md and mn > md) and md or mn
+    end
+  end
+  if h and count(mins) >= 2 then list[#list + 1] = { name = "Cheapest", t = t, v = mins, unit = "coin", color = { 0.604, 0.639, 0.678 } } end
   local V = NS.view()
   if cur.rg ~= LOA_DATA.region then
     list = {}
@@ -328,7 +335,7 @@ function NS.OpenItem(id, rg)
   c.px:SetText(l and NS.coin(l[1]) or NS.color(NS.COL.muted, "Not listed right now"))
   c.pill:SetText(l and l[5] and (NS.pctColored(l[5]) .. NS.color(NS.COL.muted, "  24h")) or "")
   c.add:SetShown(rg == LOA_DATA.region and NS.hist(id) ~= nil)
-  c.stats[1].v:SetText(l and NS.coin(l[2]) or "\226\128\147")
+  c.stats[1].v:SetText(l and NS.coin(math.min(l[2] > 0 and l[2] or l[1], l[1])) or "\226\128\147")
   c.stats[2].v:SetText(l and NS.fmt(l[4]) or "0")
   c.stats[3].v:SetText(l and NS.fmt(l[3]) or "0")
   c.stats[4].v:SetText(cat[7] and cat[7] > 0 and NS.coin(cat[7]) or "\226\128\147")
