@@ -804,6 +804,7 @@ local function minimapButton()
 end
 
 function NS.OnLoad()
+  if NS.SetupTooltips then NS.SetupTooltips() end
   local mine = NS.detectRuleset()
   if mine then
     NS.db.rulesets = NS.db.rulesets or {}
@@ -817,6 +818,11 @@ SLASH_LIFEONAZEROTH1 = "/market"
 SLASH_LIFEONAZEROTH2 = "/loa"
 SlashCmdList.LIFEONAZEROTH = function(msg)
   msg = string.lower(msg or "")
+  if msg == "tooltip" then
+    NS.db.tooltip = NS.db.tooltip == false
+    DEFAULT_CHAT_FRAME:AddMessage(NS.color(NS.COL.title, "Life on Azeroth:") .. " prices in item tooltips " .. (NS.db.tooltip and "on." or "off."))
+    return
+  end
   if msg == "minimap" then
     NS.db.minimap.hide = not NS.db.minimap.hide
     if NS.minimapButton then NS.minimapButton:SetShown(not NS.db.minimap.hide) end

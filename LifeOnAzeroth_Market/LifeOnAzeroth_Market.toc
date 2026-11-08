@@ -12,3 +12,4 @@ Core.lua
 Chart.lua
 Item.lua
 UI.lua
+Tooltip.lua
