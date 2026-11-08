@@ -132,7 +132,7 @@ namespace LifeOnAzeroth
             {
                 long t = T[i], age = tmax - t;
                 string bucket;
-                if (age <= 48 * 3600) bucket = "h" + i;
+                if (age <= 72 * 3600) bucket = "h" + i;
                 else if (age <= 14 * 86400L) bucket = "q" + (t / 21600);
                 else if (age <= 60 * 86400L) bucket = "d" + (t / 86400);
                 else bucket = "w" + (t / 604800);
@@ -222,7 +222,7 @@ namespace LifeOnAzeroth
             sb.Append("},\n");
         }
 
-        const int Format = 3;
+        const int Format = 4;
 
         static int DataFormat(string file)
         {
