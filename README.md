@@ -1,4 +1,4 @@
-# Life on Azeroth Market
+# Life on Azeroth: Market
 
 The auction house market from [lifeonazeroth.com](https://lifeonazeroth.com/#economy), inside WoW: Forever.
 
@@ -14,7 +14,7 @@ Open it with `/market` or the coin by your minimap.
 Addons cannot go online, so a small companion app does that part.
 
 1. Download `LifeOnAzerothCompanion.exe` from the [latest release](https://github.com/sanredz/LifeOnAzeroth-Addon/releases/latest) and run it. There is nothing to install.
-2. It finds your game, installs the addon if you don't have it yet and downloads new prices every hour into a small `LifeOnAzeroth_Data` addon.
+2. It finds your game, installs the addon if you don't have it yet and downloads new prices every hour into a small `LifeOnAzeroth_Data` addon. If WoW is already open when the addon is first installed, restart the game once so it shows up.
 3. In game, type `/reload` or shift-click the minimap coin to load the newest prices.
 
 The app can start with Windows and keeps running in the tray when you close it. Right-click the tray icon to quit.
@@ -25,7 +25,7 @@ Windows may say the app is unrecognised the first time. Click **More info**, the
 
 | Folder | What it is |
 | --- | --- |
-| `LifeOnAzeroth/` | The addon. |
+| `LifeOnAzeroth_Market/` | The addon. |
 | `companion/` | The companion app (C#, .NET Framework 4, which ships with Windows 10 and 11). |
 
 ## Building
@@ -34,7 +34,7 @@ Windows may say the app is unrecognised the first time. Click **More info**, the
 python build.py
 ```
 
-This builds `dist/LifeOnAzerothCompanion.exe` with the addon files packed inside, and `dist/LifeOnAzeroth-<version>.zip` for addon sites. It only needs Python 3 and the C# compiler that comes with Windows. Pushing a `v*` tag builds both on GitHub and attaches them to a release.
+This builds `dist/LifeOnAzerothCompanion.exe` with the addon files packed inside, and `dist/LifeOnAzeroth_Market-<version>.zip` for addon sites. It only needs Python 3 and the C# compiler that comes with Windows. Pushing a `v*` tag builds both on GitHub and attaches them to a release.
 
 ## Slash commands
 

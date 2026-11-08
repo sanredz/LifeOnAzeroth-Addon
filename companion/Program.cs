@@ -377,7 +377,7 @@ namespace LifeOnAzeroth
         Toggle startToggle, trayToggle;
         LinkText changeLink, openLink, siteLink;
         System.Windows.Forms.Timer timer;
-        bool busy, quitting, startHidden;
+        bool busy, quitting, startHidden, freshInstall;
         double progress;
         string statusTitle = "Starting", statusDetail = "", progressText = "";
         Color statusColor = Theme.Muted;
@@ -554,7 +554,7 @@ namespace LifeOnAzeroth
             }
             if (forever != null)
             {
-                try { Sync.InstallAddon(forever); }
+                try { if (Sync.InstallAddon(forever)) freshInstall = true; }
                 catch (Exception ex) { SetStatus("Can't write to the game folder", ex.Message, Theme.Down); }
             }
             Invalidate();
@@ -619,7 +619,7 @@ namespace LifeOnAzeroth
             {
                 try
                 {
-                    Sync.InstallAddon(dir);
+                    if (Sync.InstallAddon(dir)) freshInstall = true;
                     var res = Sync.Run(dir, rg, last, (txt, p) => BeginInvoke((Action)(() =>
                     {
                         progress = p;
@@ -657,7 +657,9 @@ namespace LifeOnAzeroth
                 cfg.LastBuilt = res.Built;
                 cfg.LastLatest = res.Latest;
                 cfg.Save();
-                SetStatus("New prices ready", "Type /reload in game to load them.", Theme.Up);
+                if (freshInstall && Process.GetProcessesByName("Wow").Length > 0) SetStatus("Addon installed", "Restart WoW to load it, then type /market.", Theme.Up);
+                else SetStatus("New prices ready", "Type /reload in game to load them.", Theme.Up);
+                freshInstall = false;
                 if (!Visible && !first)
                     tray.ShowBalloonTip(3000, "New auction house prices", RegionName[rg] + " prices from " + Local(res.Latest).ToString("HH:mm") + ". Type /reload in game to load them.", ToolTipIcon.None);
             }

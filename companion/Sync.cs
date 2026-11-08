@@ -25,7 +25,9 @@ namespace LifeOnAzeroth
     public static class Sync
     {
         public static readonly string Api = Environment.GetEnvironmentVariable("LOA_API") ?? "https://forever-live.sanredz.workers.dev/v1";
-        public const string AddonName = "LifeOnAzeroth";
+        public const string AddonName = "LifeOnAzeroth_Market";
+        public const string DataName = "LifeOnAzeroth_Data";
+        static readonly string[] LegacyFiles = { "LifeOnAzeroth.toc", "Core.lua", "Chart.lua", "Item.lua", "UI.lua", "Data.lua" };
         public static readonly string[] Regions = { "us", "eu", "kr", "tw" };
         static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -106,7 +108,7 @@ namespace LifeOnAzeroth
 
         public static string DataDir(string forever)
         {
-            return Path.Combine(forever, "Interface", "AddOns", AddonName + "_Data");
+            return Path.Combine(forever, "Interface", "AddOns", DataName);
         }
 
         static string TocVersion(string text)
@@ -147,9 +149,11 @@ namespace LifeOnAzeroth
             return t.Length > 0 ? Lng(t[t.Length - 1]) : 0;
         }
 
-        public static void InstallAddon(string forever)
+        public static bool InstallAddon(string forever)
         {
             string dir = AddonDir(forever);
+            bool fresh = !Directory.Exists(dir) || !Directory.Exists(DataDir(forever));
+            RemoveLegacy(forever);
             var toc = Resource("addon/" + AddonName + ".toc");
             string tocText = toc == null ? "" : Encoding.UTF8.GetString(toc);
             if (toc != null)
@@ -168,13 +172,27 @@ namespace LifeOnAzeroth
                     }
                 }
             }
-            string stale = Path.Combine(dir, "Data.lua");
-            if (File.Exists(stale)) File.Delete(stale);
             string ddir = DataDir(forever);
             Directory.CreateDirectory(ddir);
-            string dtoc = TocInterface(tocText) + "\n## Title: Life on Azeroth |cffffe08aData|r\n## Notes: Auction house prices for the Life on Azeroth Market, kept up to date by the companion app.\n## Author: sanredz\n## Version: " + Program.Version + "\n\nData.lua\n";
-            string dtocPath = Path.Combine(ddir, AddonName + "_Data.toc");
+            string dtoc = TocInterface(tocText) + "\n## Title: Life on Azeroth: |cffffe08aData|r\n## Notes: Auction house prices for the Life on Azeroth Market, kept up to date by the companion app.\n## Author: sanredz\n## Version: " + Program.Version + "\n\nData.lua\n";
+            string dtocPath = Path.Combine(ddir, DataName + ".toc");
             if (!File.Exists(dtocPath) || File.ReadAllText(dtocPath) != dtoc) File.WriteAllText(dtocPath, dtoc, new UTF8Encoding(false));
+            return fresh;
+        }
+
+        static void RemoveLegacy(string forever)
+        {
+            string old = Path.Combine(forever, "Interface", "AddOns", "LifeOnAzeroth");
+            string toc = Path.Combine(old, "LifeOnAzeroth.toc");
+            if (!File.Exists(toc)) return;
+            string text = File.ReadAllText(toc);
+            if (!text.Contains("## Author: sanredz") || !text.Contains("Life on Azeroth")) return;
+            foreach (string f in LegacyFiles)
+            {
+                string p = Path.Combine(old, f);
+                if (File.Exists(p)) File.Delete(p);
+            }
+            if (Directory.GetFileSystemEntries(old).Length == 0) Directory.Delete(old);
         }
 
         public static string InstalledVersion(string forever)

@@ -1,7 +1,8 @@
 import os, re, subprocess, sys, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ADDON = os.path.join(HERE, 'LifeOnAzeroth')
+NAME = 'LifeOnAzeroth_Market'
+ADDON = os.path.join(HERE, NAME)
 APP = os.path.join(HERE, 'companion')
 DIST = os.path.join(HERE, 'dist')
 
@@ -16,7 +17,7 @@ def csc():
 
 
 def version():
-    toc = open(os.path.join(ADDON, 'LifeOnAzeroth.toc'), encoding='utf8').read()
+    toc = open(os.path.join(ADDON, NAME + '.toc'), encoding='utf8').read()
     return re.search(r'^## Version:\s*(\S+)', toc, re.M).group(1)
 
 
@@ -36,10 +37,10 @@ def build_app():
 
 
 def build_zip(ver):
-    out = os.path.join(DIST, 'LifeOnAzeroth-%s.zip' % ver)
+    out = os.path.join(DIST, '%s-%s.zip' % (NAME, ver))
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
         for f in sorted(os.listdir(ADDON)):
-            z.write(os.path.join(ADDON, f), 'LifeOnAzeroth/' + f)
+            z.write(os.path.join(ADDON, f), NAME + '/' + f)
     return out
 
 

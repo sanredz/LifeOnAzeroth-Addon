@@ -372,8 +372,8 @@ NS.events = CreateFrame("Frame")
 NS.events:RegisterEvent("ADDON_LOADED")
 NS.events:SetScript("OnEvent", function(self, ev, name)
   if ev == "ADDON_LOADED" and name == ADDON then
-    LifeOnAzerothDB = LifeOnAzerothDB or {}
-    local db = LifeOnAzerothDB
+    LifeOnAzeroth_MarketDB = LifeOnAzeroth_MarketDB or {}
+    local db = LifeOnAzeroth_MarketDB
     db.range = db.range or "ALL"
     db.minimap = db.minimap or { angle = 200, hide = false }
     NS.db = db
