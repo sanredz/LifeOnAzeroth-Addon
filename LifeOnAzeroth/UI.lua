@@ -349,6 +349,9 @@ local function paintHeader()
   local old = time() - (d.built or 0) > 3 * 3600
   local c = old and NS.COL.dn or NS.COL.muted
   main.fresh:SetTextColor(c[1], c[2], c[3])
+  local tw = math.max(main.note:GetStringWidth(), main.fresh:GetStringWidth())
+  main.reload:ClearAllPoints()
+  main.reload:SetPoint("RIGHT", main, "TOPRIGHT", -44 - tw - 14, -35)
 end
 
 function NS.Refresh()
@@ -556,11 +559,11 @@ local function build()
   f.fresh:SetPoint("TOPRIGHT", -44, -38)
   f.fresh:SetJustifyH("RIGHT")
   local rl = CreateFrame("Button", nil, f)
-  rl:SetSize(64, 20)
-  rl:SetPoint("RIGHT", f.fresh, "LEFT", -10, 0)
+  rl:SetSize(84, 28)
+  f.reload = rl
   NS.fill(rl, 0.973, 0.827, 0.42, 0.1):SetAllPoints()
   NS.border(rl, NS.COL.gold, 0.35)
-  rl.t = NS.text(rl, 10, NS.COL.gold)
+  rl.t = NS.text(rl, 13, NS.COL.gold)
   rl.t:SetPoint("CENTER")
   rl.t:SetText("Reload")
   rl:SetScript("OnClick", function() ReloadUI() end)
