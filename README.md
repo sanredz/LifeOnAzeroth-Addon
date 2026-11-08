@@ -1,0 +1,44 @@
+# Life on Azeroth Market
+
+The auction house market from [lifeonazeroth.com](https://lifeonazeroth.com/#economy), inside WoW: Forever.
+
+- **Price indexes** for the whole market, sectors, materials, consumables and gear, with trends and change over 6 hours, a day, a week, a month or all time.
+- **Charts** that compare up to five indexes or items.
+- **Item search** across everything seen on the auction house, with typical and cheapest price, auctions, items for sale and vendor price.
+- **Item cards** with price history, items for sale each hour, the price in every region and similar items.
+
+Open it with `/market` or the coin by your minimap.
+
+## How prices get into the game
+
+Addons cannot go online, so a small companion app does that part.
+
+1. Download `LifeOnAzerothCompanion.exe` from the [latest release](https://github.com/sanredz/LifeOnAzeroth-Addon/releases/latest) and run it. There is nothing to install.
+2. It finds your game, installs the addon if you don't have it yet and downloads new prices every hour into a small `LifeOnAzeroth_Data` addon.
+3. In game, type `/reload` or shift-click the minimap coin to load the newest prices.
+
+The app can start with Windows and keeps running in the tray when you close it. Right-click the tray icon to quit.
+
+Windows may say the app is unrecognised the first time. Click **More info**, then **Run anyway**.
+
+## Folders
+
+| Folder | What it is |
+| --- | --- |
+| `LifeOnAzeroth/` | The addon. |
+| `companion/` | The companion app (C#, .NET Framework 4, which ships with Windows 10 and 11). |
+
+## Building
+
+```
+python build.py
+```
+
+This builds `dist/LifeOnAzerothCompanion.exe` with the addon files packed inside, and `dist/LifeOnAzeroth-<version>.zip` for addon sites. It only needs Python 3 and the C# compiler that comes with Windows. Pushing a `v*` tag builds both on GitHub and attaches them to a release.
+
+## Slash commands
+
+| Command | Does |
+| --- | --- |
+| `/market` or `/loa` | Opens or closes the Market. |
+| `/market minimap` | Shows or hides the minimap button. |

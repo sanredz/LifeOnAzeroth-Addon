@@ -1,0 +1,13 @@
+## Interface: 11509, 16001, 20506, 120100, 120105
+## Title: Life on Azeroth |cffffe08aMarket|r
+## Notes: The Life on Azeroth auction house market in game: price indexes, item search and history. Prices come from the Life on Azeroth companion app. /market to open.
+## Author: sanredz
+## Version: 1.0.0
+## IconTexture: Interface\Icons\INV_Misc_Coin_17
+## SavedVariables: LifeOnAzerothDB
+## OptionalDeps: LifeOnAzeroth_Data
+
+Core.lua
+Chart.lua
+Item.lua
+UI.lua
