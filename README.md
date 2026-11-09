@@ -19,8 +19,8 @@ Open it with `/market` or the coin by your minimap.
 
 Addons cannot go online, so a small companion app does that part.
 
-1. Download `LifeOnAzerothCompanion.exe` from the [latest release](https://github.com/sanredz/LifeOnAzeroth-Addon/releases/latest) and run it. There is nothing to install.
-2. It finds your game, installs the addon if you don't have it yet and downloads new prices every hour into a small `LifeOnAzeroth_Data` addon. If WoW is already open when the addon is first installed, restart the game once so it shows up.
+1. Get the addon from [CurseForge](https://www.curseforge.com/wow/addons/lifeonazeroth-market), so it keeps itself up to date.
+2. Download `LifeOnAzerothCompanion.exe` from the [latest release](https://github.com/sanredz/LifeOnAzeroth-Addon/releases/latest) and run it. There is nothing to install. It finds your game and downloads new prices every hour into a small `LifeOnAzeroth_Data` addon. If WoW is already open the first time, restart the game once so it shows up.
 3. In game, type `/reload` or shift-click the minimap coin to load the newest prices.
 
 The app can start with Windows and keeps running in the tray when you close it. Right-click the tray icon to quit.
@@ -35,3 +35,7 @@ Windows may say the app is unrecognised the first time. Click **More info**, the
 | --- | --- |
 | `/market` or `/loa` | Opens or closes the Market. |
 | `/market minimap` | Shows or hides the minimap button. |
+
+## License
+
+All rights reserved. The addon and the companion app are free to use for your own play, and the code is public so you can see what they do, but it is not open source: please don't copy, modify or redistribute it. See [LICENSE](LICENSE).
