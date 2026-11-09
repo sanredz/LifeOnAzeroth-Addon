@@ -19,15 +19,15 @@ using Microsoft.Win32;
 [assembly: AssemblyCompany("Life on Azeroth")]
 [assembly: AssemblyProduct("Life on Azeroth Companion")]
 [assembly: AssemblyCopyright("© 2026 Life on Azeroth")]
-[assembly: AssemblyVersion("1.0.3.0")]
-[assembly: AssemblyFileVersion("1.0.3.0")]
-[assembly: AssemblyInformationalVersion("1.0.3")]
+[assembly: AssemblyVersion("1.0.4.0")]
+[assembly: AssemblyFileVersion("1.0.4.0")]
+[assembly: AssemblyInformationalVersion("1.0.4")]
 
 namespace LifeOnAzeroth
 {
     static class Program
     {
-        public const string Version = "1.0.3";
+        public const string Version = "1.0.4";
         public static int ShowMsg;
 
         [DllImport("user32.dll")] static extern int RegisterWindowMessage(string msg);

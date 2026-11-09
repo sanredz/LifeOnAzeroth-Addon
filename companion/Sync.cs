@@ -56,6 +56,38 @@ namespace LifeOnAzeroth
             throw last;
         }
 
+        static string[] SplitBundle(string s, int count)
+        {
+            int i = s.IndexOf('[');
+            if (i < 0) return null;
+            var res = new List<string>(count);
+            int depth = 0, start = -1;
+            bool str = false;
+            for (int k = i + 1; k < s.Length; k++)
+            {
+                char c = s[k];
+                if (str)
+                {
+                    if (c == '\\') k++;
+                    else if (c == '"') str = false;
+                    continue;
+                }
+                if (c == '"') { str = true; continue; }
+                if (c == '{' || c == '[')
+                {
+                    if (depth == 0) start = k;
+                    depth++;
+                }
+                else if (c == '}' || c == ']')
+                {
+                    if (depth == 0) break;
+                    depth--;
+                    if (depth == 0) res.Add(s.Substring(start, k - start + 1));
+                }
+            }
+            return res.Count == count ? res.ToArray() : null;
+        }
+
         static object Json(string s)
         {
             var js = new JavaScriptSerializer();
@@ -400,11 +432,20 @@ namespace LifeOnAzeroth
             }
             var houses = new Dictionary<string, Dictionary<string, object>>();
             int hd = 0;
-            foreach (string hk in HouseKeys)
+            progress("Downloading prices for each auction house", 0.19);
+            try
             {
-                progress("Downloading prices for each auction house", 0.19 + 0.003 * hd++);
-                try { houses[hk] = Obj(Json(Get("/market/" + region + "/house/" + hk))); } catch { }
+                var all = Obj(Json(Get("/market/" + region + "/houses")));
+                foreach (string hk in HouseKeys)
+                    if (all.ContainsKey(hk) && all[hk] != null) houses[hk] = Obj(all[hk]);
             }
+            catch { }
+            if (houses.Count == 0)
+                foreach (string hk in HouseKeys)
+                {
+                    progress("Downloading prices for each auction house", 0.19 + 0.003 * hd++);
+                    try { houses[hk] = Obj(Json(Get("/market/" + region + "/house/" + hk))); } catch { }
+                }
 
             var keep = Thin(T);
             var HT = keep.Select(i => T[i]).ToArray();
@@ -418,11 +459,16 @@ namespace LifeOnAzeroth
             int shardsDone = 0;
             var lockObj = new object();
             Exception shardErr = null;
+            progress("Downloading price history", 0.22);
+            string[] parts = null;
+            try { parts = SplitBundle(Get("/shards/" + region), 64); } catch { parts = null; }
             Parallel.For(0, 64, new ParallelOptions { MaxDegreeOfParallelism = 6 }, sh =>
             {
                 try
                 {
-                    var d = Obj(Json(Get("/shard/" + region + "/" + sh)));
+                    string raw = null;
+                    if (parts != null) { raw = parts[sh]; parts[sh] = null; }
+                    var d = Obj(Json(raw ?? Get("/shard/" + region + "/" + sh)));
                     var st = Arr(Field(d, "t")).Select(Lng).ToArray();
                     var items = Obj(Field(d, "i"));
                     var localH = new List<KeyValuePair<string, KeyValuePair<long, long[][]>>>();
