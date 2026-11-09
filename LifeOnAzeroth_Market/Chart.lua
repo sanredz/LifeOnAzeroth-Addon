@@ -115,10 +115,10 @@ function Chart:Draw(list, opts)
       for i = 1, #s.t do if s.v[i] then t0 = math.min(t0, s.t[i]) break end end
     end
   end
-  local rel = #list > 1 and not opts.abs
+  local rel = (#list > 1 or opts.rel) and not opts.abs
   local S, total = {}, 0
   for k, s in ipairs(list) do
-    local pts, base = {}, nil
+    local pts, base = {}, s.base
     for i = 1, #s.t do
       local v = s.v[i]
       if v and s.t[i] >= t0 then

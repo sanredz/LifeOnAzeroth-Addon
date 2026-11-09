@@ -183,15 +183,20 @@ function NS.idx(key)
 end
 
 local histCache = {}
-function NS.hist(id)
-  local V, rs = NS.view()
+function NS.hist(id, hk)
+  local V, rs
+  if hk then
+    V, rs = LOA_DATA and LOA_DATA.houses and LOA_DATA.houses[hk], hk
+  else
+    V, rs = NS.view()
+  end
   local s = V and V.hist and V.hist[id]
   if not s then return nil end
   local ck = (rs or "") .. "|" .. id
   local c = histCache[ck]
   if c and c.src == s then return c.h end
   local parts = splitFields(s, ";")
-  local h = { med = NS.decodeNums(parts[1] or "", 36), min = NS.decodeNums(parts[2] or "", 36), qty = NS.decodeNums(parts[3] or "", 36) }
+  local h = { med = NS.decodeNums(parts[1] or "", 36), min = NS.decodeNums(parts[2] or "", 36), qty = NS.decodeNums(parts[3] or "", 36), sold = parts[4] and NS.decodeNums(parts[4], 36) or nil }
   histCache[ck] = { src = s, h = h }
   return h
 end
@@ -338,6 +343,7 @@ function NS.appUpdate()
 end
 
 function NS.fmtTime(t, span)
+  t = math.floor(t)
   if span > 3 * 86400 then return date("%b %d", t) end
   if span > 18 * 3600 then return date("%b %d, %H:%M", t) end
   return date("%H:%M", t)

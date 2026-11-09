@@ -284,7 +284,7 @@ namespace LifeOnAzeroth
             foreach (var kv in hist)
             {
                 sb.Append("[").Append(kv.Key).Append("] = \"");
-                for (int s = 0; s < 3; s++)
+                for (int s = 0; s < kv.Value.Length; s++)
                 {
                     if (s > 0) sb.Append(';');
                     var a = kv.Value[s];
@@ -548,10 +548,26 @@ namespace LifeOnAzeroth
                         var arrs = Arr(kv.Value);
                         if (arrs.Length < 5) continue;
                         long id = long.Parse(kv.Key, Inv);
+                        var soldBy = arrs.Length > 5 ? Obj(arrs[5]) : null;
                         foreach (var hkv in Obj(arrs[4]))
                         {
                             if (!wanted.Contains(hkv.Key) || !histH.ContainsKey(hkv.Key)) continue;
                             var ha = Trim(Align(Arr(hkv.Value), st, pos, K), HT);
+                            if (ha != null)
+                            {
+                                var sold = new long[K];
+                                object so;
+                                if (soldBy != null && soldBy.TryGetValue(hkv.Key, out so))
+                                {
+                                    var sa = Arr(so);
+                                    for (int j = 0; j < st.Length && j < sa.Length; j++)
+                                    {
+                                        int p;
+                                        if (pos.TryGetValue(st[j], out p)) sold[p] = Lng(sa[j]);
+                                    }
+                                }
+                                ha = new long[][] { ha[0], ha[1], ha[2], sold };
+                            }
                             if (ha != null) localH.Add(new KeyValuePair<string, KeyValuePair<long, long[][]>>(hkv.Key, new KeyValuePair<long, long[][]>(id, ha)));
                         }
                     }

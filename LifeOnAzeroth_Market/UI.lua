@@ -105,14 +105,19 @@ local function buildSide(f)
   side:SetPoint("TOPLEFT", 16, -112)
   side:SetPoint("BOTTOMLEFT", 16, 16)
   side:SetWidth(SIDE_W)
+  side.mode = NS.segmented(side, { "idx", "mov" }, function(k) NS.db.sideMode = k NS.Refresh() end, 167)
+  side.mode:SetPoint("TOPLEFT", 0, 0)
+  side.mode.buttons[1].label:SetText("Indexes")
+  side.mode.buttons[2].label:SetText("Today's movers")
   side.per = NS.text(side, 12, NS.COL.ink2)
-  side.per:SetPoint("TOPLEFT", 4, 0)
+  side.per:SetPoint("TOPLEFT", 4, -36)
   side.perSub = NS.text(side, 10, NS.COL.muted)
-  side.perSub:SetPoint("TOPLEFT", 4, -16)
+  side.perSub:SetPoint("TOPLEFT", 4, -52)
   side.perSub:SetText("Follows the chart's time range")
   local head = CreateFrame("Frame", nil, side)
-  head:SetPoint("TOPLEFT", 0, -36)
-  head:SetPoint("TOPRIGHT", 0, -36)
+  side.head = head
+  head:SetPoint("TOPLEFT", 0, -72)
+  head:SetPoint("TOPRIGHT", 0, -72)
   head:SetHeight(22)
   NS.fill(head, 0, 0, 0, 0.3):SetAllPoints()
   local function hcol(txt, x, w, just)
@@ -128,7 +133,7 @@ local function buildSide(f)
   hcol("VALUE", SIDE_W - 110, 46, "RIGHT")
   side.hch = hcol("ALL TIME", SIDE_W - 62, 54, "RIGHT")
   local sf = CreateFrame("ScrollFrame", nil, side)
-  sf:SetPoint("TOPLEFT", 0, -60)
+  sf:SetPoint("TOPLEFT", 0, -96)
   sf:SetPoint("BOTTOMRIGHT", -6, 0)
   local child = CreateFrame("Frame", nil, sf)
   child:SetSize(SIDE_W - 8, 10)
@@ -288,12 +293,16 @@ local function paintChart()
   local area = main.right
   local d = D()
   local span = NS.rangeSpan(NS.db.range)
-  for i = #st.series, 1, -1 do
-    local s = st.series[i]
-    if (s.kind == "idx" and not NS.idx(s.key)) or (s.kind == "item" and not d.cat[s.id]) or (s.kind ~= "idx" and s.kind ~= "item") then table.remove(st.series, i) end
+  local mov = NS.db.sideMode == "mov" and NS.MoverSeries and NS.MoverSeries()
+  local S = mov or st.series
+  if not mov then
+    for i = #st.series, 1, -1 do
+      local s = st.series[i]
+      if (s.kind == "idx" and not NS.idx(s.key)) or (s.kind == "item" and not d.cat[s.id]) or (s.kind ~= "idx" and s.kind ~= "item") then table.remove(st.series, i) end
+    end
   end
   local list = {}
-  for k, s in ipairs(st.series) do
+  for k, s in ipairs(S) do
     local x = NS.seriesData(s)
     x.color = NS.SERIES[k]
     list[k] = x
@@ -306,7 +315,7 @@ local function paintChart()
     local col = NS.SERIES[k]
     c.dot:SetColorTexture(col[1], col[2], col[3], 1)
     c.ic.icon:SetTexture(s.icon)
-    local it = st.series[k]
+    local it = S[k]
     if it.kind == "item" then
       local cat = d.cat[it.id]
       c.ic:SetQuality(cat and cat[2])
@@ -319,6 +328,7 @@ local function paintChart()
     c.nm:SetText(s.name)
     c.ch:SetText(NS.pctColored(NS.change(s.t, s.v, span)))
     c.x.idx = k
+    c.x:SetShown(not mov)
     local w = 46 + c.nm:GetStringWidth() + 8 + c.ch:GetStringWidth() + 26
     c:SetWidth(w)
     if x > 0 and x + w > maxW then x, y = 0, y + 32 end
@@ -327,7 +337,7 @@ local function paintChart()
     c:Show()
     x = x + w + 6
   end
-  if #list < 5 then
+  if #list < 5 and not mov then
     area.hint:ClearAllPoints()
     if x > 0 and x + area.hint:GetStringWidth() + 8 > maxW then x, y = 0, y + 32 end
     area.hint:SetPoint("TOPLEFT", x + 4, -y - 7)
@@ -337,21 +347,21 @@ local function paintChart()
   end
   area.chart:SetPoint("TOPLEFT", area, "TOPLEFT", 0, -y - 40)
   area.foot:SetText(#list > 1 and "Compared as % change from the start of the range." or "Index value; every index starts at 100 when its history begins.")
-  if #list == 1 and st.series[1].kind == "item" then area.foot:SetText("Typical price each hour.") end
+  if #list == 1 and S[1].kind == "item" then area.foot:SetText("Typical price each hour.") end
+  if mov then area.foot:SetText("The top " .. #list .. " in the list on the left, as % change from the start of the range.") end
   if #list == 0 then area.foot:SetText("") end
-  area.chart:Draw(list, { span = span, emptyText = #list == 0 and "Nothing on the chart. Click an index on the left, or search an item, to add it." or nil })
+  area.chart:Draw(list, { span = span, rel = mov and true or nil, emptyText = #list == 0 and (mov and "No movers to chart yet." or "Nothing on the chart. Click an index on the left, or search an item, to add it.") or nil })
 end
 
 local function paintHeader()
   local d = D()
   local rn = NS.REGION_NAME[d.region] or string.upper(d.region or "")
-  local V, rs = NS.view()
-  main.note:SetText(rn .. (rs and (" \194\183 " .. NS.houseName(rs) .. " auction house") or "") .. (V.t and V.t[1] and (" \194\183 since " .. date("%b %d", V.t[1])) or ""))
+  main.note:SetText(rn)
   main.fresh:SetText("Prices " .. NS.ago(d.built) .. " \194\183 " .. date("%b %d, %H:%M", d.built))
   local old = time() - (d.built or 0) > 3 * 3600
   local c = old and NS.COL.dn or NS.COL.muted
   main.fresh:SetTextColor(c[1], c[2], c[3])
-  local tw = math.max(main.note:GetStringWidth(), main.fresh:GetStringWidth())
+  local tw = math.min(300, math.max(main.note:GetStringWidth(), main.fresh:GetStringWidth()))
   main.reload:ClearAllPoints()
   main.reload:SetPoint("RIGHT", main, "TOPRIGHT", -44 - tw - 14, -35)
   local up = NS.appUpdate()
@@ -366,6 +376,12 @@ local function paintHeader()
     P.body:SetText("Open " .. NS.color(NS.COL.ink, "Life on Azeroth Companion") .. " from its tray icon by the clock and click " .. NS.color(NS.COL.ink, "Update") .. ". It takes a few seconds and keeps your settings. Or download it from the link below.")
   end
   P:SetHeight(42 + P.body:GetStringHeight() + 14 + 30 + 30)
+end
+
+local function f_view()
+  local v = NS.db and NS.db.view
+  if v == "items" or v == "port" then return v end
+  return "market"
 end
 
 function NS.Refresh()
@@ -395,8 +411,19 @@ function NS.Refresh()
     b.label:SetText(b.text .. (b.mine and " \226\128\162" or ""))
   end
   paintHeader()
-  paintSide()
-  paintChart()
+  if NS.PaintViews then NS.PaintViews() end
+  if f_view() == "market" then
+    local mov = NS.db.sideMode == "mov"
+    local side = main.side
+    side.mode:Select(mov and "mov" or "idx")
+    side.per:SetShown(not mov)
+    side.perSub:SetShown(not mov)
+    side.head:SetShown(not mov)
+    side.sf:SetShown(not mov)
+    if NS.PaintMovers then NS.PaintMovers(side, mov) end
+    if not mov then paintSide() end
+    paintChart()
+  end
 end
 
 local function searchHits(q)
@@ -685,6 +712,8 @@ local function build()
   f.note = NS.text(f, 12, NS.COL.muted)
   f.note:SetPoint("TOPRIGHT", -44, -22)
   f.note:SetJustifyH("RIGHT")
+  f.note:SetWidth(300)
+  f.note:SetWordWrap(false)
   f.fresh = NS.text(f, 10, NS.COL.muted)
   f.fresh:SetPoint("TOPRIGHT", -44, -38)
   f.fresh:SetJustifyH("RIGHT")
@@ -819,6 +848,7 @@ local function build()
   tinsert(UISpecialFrames, "LifeOnAzerothMarketFrame")
   f:SetScript("OnShow", function() NS.Refresh() end)
   f:SetScript("OnHide", function() if NS.CloseItem then NS.CloseItem() end end)
+  if NS.BuildViews then NS.BuildViews(f) end
   f:Hide()
   return f
 end
