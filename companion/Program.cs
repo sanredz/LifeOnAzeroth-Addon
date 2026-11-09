@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -19,15 +20,15 @@ using Microsoft.Win32;
 [assembly: AssemblyCompany("Life on Azeroth")]
 [assembly: AssemblyProduct("Life on Azeroth Companion")]
 [assembly: AssemblyCopyright("© 2026 Life on Azeroth")]
-[assembly: AssemblyVersion("1.0.4.0")]
-[assembly: AssemblyFileVersion("1.0.4.0")]
-[assembly: AssemblyInformationalVersion("1.0.4")]
+[assembly: AssemblyVersion("1.0.5.0")]
+[assembly: AssemblyFileVersion("1.0.5.0")]
+[assembly: AssemblyInformationalVersion("1.0.5")]
 
 namespace LifeOnAzeroth
 {
-    static class Program
+    static partial class Program
     {
-        public const string Version = "1.0.4";
+        public const string Version = "1.0.5";
         public static int ShowMsg;
 
         [DllImport("user32.dll")] static extern int RegisterWindowMessage(string msg);
@@ -38,18 +39,130 @@ namespace LifeOnAzeroth
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             ShowMsg = RegisterWindowMessage("LifeOnAzerothCompanion.Show");
-            bool fresh;
-            using (var mutex = new Mutex(true, "LifeOnAzerothCompanion", out fresh))
+            bool updated = args.Contains("--updated");
+            using (var mutex = new Mutex(false, "LifeOnAzerothCompanion"))
             {
-                if (!fresh)
+                bool own;
+                try { own = mutex.WaitOne(updated ? 30000 : 0); }
+                catch (AbandonedMutexException) { own = true; }
+                if (!own && !updated && StopOlder())
+                {
+                    try { own = mutex.WaitOne(10000); }
+                    catch (AbandonedMutexException) { own = true; }
+                }
+                if (!own)
                 {
                     if (!args.Contains("--tray")) PostMessage((IntPtr)0xffff, ShowMsg, IntPtr.Zero, IntPtr.Zero);
                     return;
                 }
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new MainForm(args.Contains("--tray")));
+                try
+                {
+                    Updater.Cleanup();
+                    Application.EnableVisualStyles();
+                    Application.SetCompatibleTextRenderingDefault(false);
+                    Application.Run(new MainForm(args.Contains("--tray"), updated));
+                }
+                finally
+                {
+                    try { mutex.ReleaseMutex(); } catch { }
+                }
             }
+        }
+    }
+
+    static partial class Program
+    {
+        static bool StopOlder()
+        {
+            bool any = false;
+            int me = Process.GetCurrentProcess().Id;
+            var mine = new System.Version(Version);
+            foreach (var p in Process.GetProcesses())
+            {
+                try
+                {
+                    if (p.Id == me || !p.ProcessName.StartsWith("LifeOnAzeroth", StringComparison.OrdinalIgnoreCase)) continue;
+                    var fi = p.MainModule.FileVersionInfo;
+                    if (fi.ProductName != "Life on Azeroth Companion") continue;
+                    System.Version v;
+                    if (!System.Version.TryParse(fi.ProductVersion ?? "", out v) || v >= mine) continue;
+                    p.Kill();
+                    p.WaitForExit(5000);
+                    any = true;
+                }
+                catch { }
+                finally { p.Dispose(); }
+            }
+            return any;
+        }
+    }
+
+    static class Updater
+    {
+        const string Origin = "https://github.com/sanredz/LifeOnAzeroth-Addon/releases/download/";
+        public const string Page = "https://github.com/sanredz/LifeOnAzeroth-Addon/releases/latest";
+
+        static string Exe { get { return Application.ExecutablePath; } }
+
+        public static void Cleanup()
+        {
+            string old = Exe + ".old";
+            if (!File.Exists(old)) return;
+            Task.Factory.StartNew(() =>
+            {
+                for (int i = 0; i < 40; i++)
+                {
+                    try { if (File.Exists(old)) File.Delete(old); return; }
+                    catch { Thread.Sleep(500); }
+                }
+            });
+        }
+
+        public static void Install(AppInfo app, Action<double> progress)
+        {
+            string url = Environment.GetEnvironmentVariable("LOA_UPDATE_ORIGIN") != null && app.Url.StartsWith(Environment.GetEnvironmentVariable("LOA_UPDATE_ORIGIN")) ? app.Url : null;
+            if (url == null && app.Url != null && app.Url.StartsWith(Origin) && app.Url.EndsWith("/LifeOnAzerothCompanion.exe")) url = app.Url;
+            if (url == null || string.IsNullOrEmpty(app.Sha)) throw new InvalidOperationException("This update can't be installed from here.");
+            var req = (HttpWebRequest)WebRequest.Create(url);
+            req.UserAgent = "LifeOnAzerothCompanion/" + Program.Version;
+            req.Timeout = 30000;
+            req.ReadWriteTimeout = 60000;
+            byte[] data;
+            using (var res = (HttpWebResponse)req.GetResponse())
+            using (var s = res.GetResponseStream())
+            using (var ms = new MemoryStream())
+            {
+                long total = res.ContentLength;
+                var buf = new byte[65536];
+                int n;
+                while ((n = s.Read(buf, 0, buf.Length)) > 0)
+                {
+                    ms.Write(buf, 0, n);
+                    if (ms.Length > 64L << 20) throw new InvalidOperationException("The download was too large.");
+                    if (total > 0) progress(0.05 + 0.85 * ms.Length / total);
+                }
+                data = ms.ToArray();
+            }
+            string sha;
+            using (var h = SHA256.Create()) sha = BitConverter.ToString(h.ComputeHash(data)).Replace("-", "");
+            if (!sha.Equals(app.Sha.Trim(), StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("The download didn't match the published version, so nothing was changed.");
+            progress(0.95);
+            string exe = Exe, tmp = exe + ".new", old = exe + ".old";
+            File.WriteAllBytes(tmp, data);
+            if (File.Exists(old)) File.Delete(old);
+            File.Move(exe, old);
+            try { File.Move(tmp, exe); }
+            catch
+            {
+                File.Move(old, exe);
+                throw;
+            }
+            progress(1);
+        }
+
+        public static void Restart(bool hidden)
+        {
+            Process.Start(Exe, "--updated" + (hidden ? " --tray" : ""));
         }
     }
 
@@ -372,7 +485,14 @@ namespace LifeOnAzeroth
         Image logo;
         Icon appIcon;
         NotifyIcon tray;
-        FlatButton updateBtn;
+        FlatButton updateBtn, appBtn;
+        LinkText checkLink;
+        AppInfo appUpdate;
+        Icon dotIcon;
+        ToolStripMenuItem updItem;
+        bool wowWas, idle, checking, justUpdated;
+        DateTime nextAppCheck = DateTime.MinValue, linkReset = DateTime.MaxValue;
+        string trayBase = "Life on Azeroth Companion";
         Segmented regionSeg;
         Toggle startToggle, trayToggle;
         LinkText changeLink, openLink, siteLink;
@@ -384,9 +504,10 @@ namespace LifeOnAzeroth
         DateTime nextCheck = DateTime.MinValue, lastCheck = DateTime.MinValue;
         string forever;
 
-        public MainForm(bool hidden)
+        public MainForm(bool hidden, bool updated)
         {
             startHidden = hidden;
+            justUpdated = updated;
             var asm = Assembly.GetExecutingAssembly();
             using (var s = asm.GetManifestResourceStream("app.ico")) appIcon = new Icon(s);
             using (var s = asm.GetManifestResourceStream("logo96.png")) logo = Image.FromStream(s);
@@ -408,6 +529,16 @@ namespace LifeOnAzeroth
             updateBtn.Click += delegate { CheckNow(true); };
             Controls.Add(updateBtn);
 
+            appBtn = new FlatButton("Update", true);
+            appBtn.Bounds = R(436, 402, 100, 30);
+            appBtn.Visible = false;
+            appBtn.Click += delegate { InstallUpdate(); };
+            Controls.Add(appBtn);
+
+            checkLink = new LinkText("Check for updates");
+            checkLink.Click += delegate { CheckApp(true); };
+            Controls.Add(checkLink);
+
             changeLink = new LinkText("Change");
             changeLink.Location = new Point(P(488), P(232));
             changeLink.Click += delegate { PickFolder(); };
@@ -428,6 +559,7 @@ namespace LifeOnAzeroth
             startToggle.Location = new Point(P(24), P(354));
             startToggle.Size = new Size(startToggle.Fit(P(28)), P(28));
             startToggle.On = AutoStart;
+            if (startToggle.On && !AutoStartHere) AutoStart = true;
             startToggle.Changed += delegate { AutoStart = startToggle.On; };
             Controls.Add(startToggle);
 
@@ -442,10 +574,14 @@ namespace LifeOnAzeroth
             siteLink.Location = new Point(ClientSize.Width - P(24) - siteLink.PreferredWidth, P(50));
             siteLink.Click += delegate { Process.Start("https://lifeonazeroth.com/#economy"); };
             Controls.Add(siteLink);
+            PlaceCheck();
 
             var menu = new ContextMenuStrip();
             menu.Items.Add("Open", null, delegate { ShowWindow(); });
             menu.Items.Add("Update now", null, delegate { CheckNow(true); });
+            updItem = new ToolStripMenuItem("Install the app update", null, delegate { InstallUpdate(); });
+            updItem.Visible = false;
+            menu.Items.Add(updItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Quit", null, delegate { quitting = true; Close(); });
             tray = new NotifyIcon { Icon = appIcon, Text = "Life on Azeroth Companion", ContextMenuStrip = menu, Visible = true };
@@ -453,10 +589,175 @@ namespace LifeOnAzeroth
             tray.BalloonTipClicked += delegate { ShowWindow(); };
 
             timer = new System.Windows.Forms.Timer { Interval = 15000 };
-            timer.Tick += delegate { if (!busy && DateTime.Now >= nextCheck) CheckNow(false); Invalidate(R(24, 108, 512, 100)); };
+            timer.Tick += delegate { Tick(); Invalidate(R(24, 108, 512, 100)); };
             timer.Start();
 
+            if (justUpdated) SetStatus("Updated to v" + Program.Version, "You have the latest version of the app.", Theme.Up);
             Resolve();
+        }
+
+        void PlaceCheck()
+        {
+            checkLink.Location = new Point(ClientSize.Width - P(24) - checkLink.PreferredWidth, P(24));
+            Invalidate(new Rectangle(ClientSize.Width / 2, 0, ClientSize.Width / 2, P(48)));
+        }
+
+        bool WowRunning()
+        {
+            bool found = false;
+            foreach (var p in Process.GetProcessesByName("Wow"))
+            {
+                try
+                {
+                    if (!found)
+                    {
+                        string f = null;
+                        try { f = p.MainModule.FileName; } catch { }
+                        if (f == null || forever == null || f.StartsWith(forever + "\\", StringComparison.OrdinalIgnoreCase)) found = true;
+                    }
+                }
+                finally { p.Dispose(); }
+            }
+            return found;
+        }
+
+        void Tick()
+        {
+            bool wow = WowRunning();
+            if (wow && !wowWas) nextCheck = DateTime.Now;
+            wowWas = wow;
+            if (DateTime.Now >= linkReset)
+            {
+                linkReset = DateTime.MaxValue;
+                checkLink.Text = "Check for updates";
+                PlaceCheck();
+            }
+            if (busy) return;
+            if (DateTime.Now >= nextCheck)
+            {
+                if (wow || forever == null || !Sync.HasData(forever)) { idle = false; CheckNow(false); }
+                else if (!idle)
+                {
+                    idle = true;
+                    SetStatus(justUpdated ? "Updated to v" + Program.Version : "Waiting for WoW", "New prices download when you start the game.", Theme.GoldDim);
+                }
+            }
+            if (!busy && !checking && DateTime.Now >= nextAppCheck) CheckApp(false);
+        }
+
+        void CheckApp(bool manual)
+        {
+            if (checking || updating) return;
+            checking = true;
+            if (manual) { checkLink.Text = "Checking..."; PlaceCheck(); }
+            string rg = GameRegion, dir = forever;
+            Task.Factory.StartNew(() =>
+            {
+                AppInfo a = null;
+                Exception err = null;
+                try
+                {
+                    a = Sync.PeekApp(rg);
+                    if (dir != null) Sync.MarkApp(dir, a);
+                }
+                catch (Exception e) { err = e; }
+                BeginInvoke((Action)(() =>
+                {
+                    checking = false;
+                    nextAppCheck = DateTime.Now.AddHours(err == null ? 6 : 1);
+                    if (err == null) SetApp(a);
+                    if (manual)
+                    {
+                        checkLink.Text = err != null ? "Couldn't check, try again later" : appUpdate != null ? "Version " + appUpdate.Version + " is out" : "You have the latest version";
+                        PlaceCheck();
+                        linkReset = DateTime.Now.AddSeconds(6);
+                    }
+                }));
+            });
+        }
+
+        void SetApp(AppInfo a)
+        {
+            appUpdate = Sync.IsUpdate(a) ? a : null;
+            bool on = appUpdate != null;
+            appBtn.Visible = on;
+            appBtn.Enabled = !busy;
+            updItem.Visible = on;
+            if (on) updItem.Text = "Install version " + appUpdate.Version;
+            if (on && dotIcon == null) dotIcon = Dotted(appIcon);
+            tray.Icon = on ? dotIcon : appIcon;
+            SetTray();
+            Invalidate();
+        }
+
+        void SetTray()
+        {
+            string t = trayBase + (appUpdate != null ? " · update ready" : "");
+            tray.Text = t.Length > 63 ? t.Substring(0, 63) : t;
+        }
+
+        static Icon Dotted(Icon src)
+        {
+            using (var bmp = new Bitmap(32, 32))
+            {
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    using (var big = new Icon(src, 32, 32)) g.DrawIcon(big, new Rectangle(0, 0, 32, 32));
+                    using (var b = new SolidBrush(Theme.Bg)) g.FillEllipse(b, 16, 16, 16, 16);
+                    using (var b = new SolidBrush(Theme.Up)) g.FillEllipse(b, 19, 19, 10, 10);
+                }
+                return Icon.FromHandle(bmp.GetHicon());
+            }
+        }
+
+        bool updating;
+
+        void InstallUpdate()
+        {
+            if (appUpdate == null || updating || busy) return;
+            updating = true;
+            busy = true;
+            updateBtn.Enabled = false;
+            appBtn.Enabled = false;
+            progress = 0.02;
+            var app = appUpdate;
+            bool hidden = !Visible;
+            SetStatus("Updating the app", "Downloading version " + app.Version, Theme.Busy);
+            Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    Updater.Install(app, p => BeginInvoke((Action)(() => { progress = p; Invalidate(R(24, 108, 512, 100)); })));
+                    BeginInvoke((Action)(() =>
+                    {
+                        SetStatus("Restarting", "Opening version " + app.Version, Theme.Busy);
+                        try { Updater.Restart(hidden); }
+                        catch
+                        {
+                            updating = false;
+                            busy = false;
+                            SetStatus("Updated to v" + app.Version, "Quit and open the app again to finish.", Theme.Up);
+                            return;
+                        }
+                        quitting = true;
+                        Close();
+                    }));
+                }
+                catch (Exception ex)
+                {
+                    BeginInvoke((Action)(() =>
+                    {
+                        updating = false;
+                        busy = false;
+                        updateBtn.Enabled = true;
+                        appBtn.Enabled = true;
+                        bool denied = ex is UnauthorizedAccessException || ex is IOException;
+                        SetStatus("Couldn't update the app", denied ? "Windows didn't let it replace itself in this folder. Opening the download page instead." : ex is WebException ? "Check your internet connection and try again." : ex.Message, Theme.Down);
+                        if (denied) try { Process.Start(Updater.Page); } catch { }
+                    }));
+                }
+            });
         }
 
         int P(float v) { return (int)Math.Round(v * S); }
@@ -468,18 +769,13 @@ namespace LifeOnAzeroth
             int on = 1;
             try { if (DwmSetWindowAttribute(Handle, 20, ref on, 4) != 0) DwmSetWindowAttribute(Handle, 19, ref on, 4); } catch { }
             try { int col = (Theme.Bg.B << 16) | (Theme.Bg.G << 8) | Theme.Bg.R; DwmSetWindowAttribute(Handle, 35, ref col, 4); } catch { }
+            BeginInvoke((Action)Tick);
         }
 
         protected override void SetVisibleCore(bool value)
         {
             if (startHidden) { if (!IsHandleCreated) CreateHandle(); value = false; }
             base.SetVisibleCore(value);
-        }
-
-        protected override void OnShown(EventArgs e)
-        {
-            base.OnShown(e);
-            CheckNow(false);
         }
 
         protected override void WndProc(ref Message m)
@@ -512,6 +808,15 @@ namespace LifeOnAzeroth
             }
             tray.Visible = false;
             base.OnFormClosing(e);
+        }
+
+        static bool AutoStartHere
+        {
+            get
+            {
+                try { using (var k = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) return k != null && string.Equals(k.GetValue("LifeOnAzerothCompanion") as string, "\"" + Application.ExecutablePath + "\" --tray", StringComparison.OrdinalIgnoreCase); }
+                catch { return false; }
+            }
         }
 
         static bool AutoStart
@@ -609,7 +914,9 @@ namespace LifeOnAzeroth
                 }
             }
             busy = true;
+            idle = false;
             updateBtn.Enabled = false;
+            appBtn.Enabled = false;
             progress = 0;
             progressText = "";
             string rg = GameRegion, dir = forever;
@@ -641,7 +948,10 @@ namespace LifeOnAzeroth
         void Done(SyncResult res, string rg, Exception ex)
         {
             busy = false;
+            bool wasUpdated = justUpdated;
+            justUpdated = false;
             updateBtn.Enabled = true;
+            appBtn.Enabled = true;
             lastCheck = DateTime.Now;
             if (ex != null)
             {
@@ -651,6 +961,8 @@ namespace LifeOnAzeroth
                 return;
             }
             nextCheck = DateTime.Now.AddMinutes(15);
+            nextAppCheck = DateTime.Now.AddHours(6);
+            SetApp(res.App);
             if (res.Changed)
             {
                 cfg.LastBuilt = res.Built;
@@ -664,9 +976,10 @@ namespace LifeOnAzeroth
             {
                 cfg.LastLatest = res.Latest;
                 cfg.Save();
-                SetStatus("Up to date", "", Theme.Up);
+                SetStatus(wasUpdated ? "Updated to v" + Program.Version : "Up to date", "", Theme.Up);
             }
-            tray.Text = "Life on Azeroth · prices from " + Local(res.Latest).ToString("HH:mm");
+            trayBase = "Life on Azeroth · prices from " + Local(res.Latest).ToString("HH:mm");
+            SetTray();
         }
 
         static DateTime Local(long unix) { return new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(unix).ToLocalTime(); }
@@ -692,8 +1005,8 @@ namespace LifeOnAzeroth
                 TextRenderer.DrawText(g, "Life on Azeroth", f, new Point(P(90), P(22)), Theme.Title, TextFormatFlags.NoPadding);
             using (var f = new Font("Segoe UI", 9.5f))
                 TextRenderer.DrawText(g, "Market companion for WoW: Forever", f, new Point(P(92), P(54)), Theme.Muted, TextFormatFlags.NoPadding);
-            using (var f = new Font("Segoe UI", 8.5f))
-                TextRenderer.DrawText(g, "v" + Program.Version, f, new Rectangle(0, P(26), ClientSize.Width - P(24), P(20)), Theme.Muted, TextFormatFlags.Right | TextFormatFlags.NoPadding);
+            using (var f = new Font("Segoe UI", 9f))
+                TextRenderer.DrawText(g, "v" + Program.Version + "  ·", f, new Rectangle(0, checkLink.Top, checkLink.Left - P(4), P(20)), Theme.Muted, TextFormatFlags.Right | TextFormatFlags.NoPadding);
             using (var lg = new LinearGradientBrush(new Rectangle(P(24), P(92), P(512), 2), Color.FromArgb(150, 248, 211, 107), Color.FromArgb(0, 248, 211, 107), 0f))
                 g.FillRectangle(lg, P(24), P(92), P(512), Math.Max(1, P(1)));
 
@@ -708,13 +1021,14 @@ namespace LifeOnAzeroth
             using (var f = new Font("Segoe UI Semibold", 12.5f))
                 TextRenderer.DrawText(g, statusTitle, f, new Point(P(68), P(124)), Theme.Ink, TextFormatFlags.NoPadding);
             string detail = statusDetail;
-            if (!busy && statusColor == Theme.Up && cfg.LastLatest > 0)
+            if (!busy && (statusColor == Theme.Up || idle) && cfg.LastLatest > 0 && !justUpdated)
             {
                 string when = RegionName[GameRegion] + " prices from " + Local(cfg.LastLatest).ToString("ddd HH:mm");
-                detail = string.IsNullOrEmpty(statusDetail) ? when + " · checked " + Ago(lastCheck) : when + " · " + statusDetail;
+                if (idle) detail = when + "\nNew ones download when you start WoW";
+                else detail = string.IsNullOrEmpty(statusDetail) ? when + " · checked " + Ago(lastCheck) : when + " · " + statusDetail;
             }
             using (var f = new Font("Segoe UI", 9.25f))
-                TextRenderer.DrawText(g, detail, f, new Rectangle(P(68), P(150), P(330), P(36)), Theme.Ink2, TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, detail, f, new Rectangle(P(68), P(150), P(306), P(36)), Theme.Ink2, TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             if (busy)
             {
                 var track = new RectangleF(card.X + P(16), card.Bottom - P(12), card.Width - P(32), P(3));
@@ -730,10 +1044,19 @@ namespace LifeOnAzeroth
             DrawRow(g, 318, "Addon", ver != null ? "Life on Azeroth Market · installed, v" + ver : "Not installed yet", ver != null ? Theme.Ink : Theme.Muted, P(320));
 
             using (var p = new Pen(Theme.Line)) g.DrawLine(p, P(24), P(394), ClientSize.Width - P(24), P(394));
-            using (var f = new Font("Segoe UI", 9f))
+            if (appUpdate != null)
             {
-                TextRenderer.DrawText(g, "In game, type /reload to load new prices and /market to open the Market.", f, new Rectangle(P(24), P(406), ClientSize.Width - P(48), P(22)), Theme.Muted, TextFormatFlags.NoPadding | TextFormatFlags.HorizontalCenter);
+                using (var b = new SolidBrush(Theme.Up)) g.FillEllipse(b, P(26), P(412), P(8), P(8));
+                using (var f = new Font("Segoe UI Semibold", 9.5f))
+                    TextRenderer.DrawText(g, "Version " + appUpdate.Version + " of the app is out.", f, new Point(P(42), P(407)), Theme.Ink, TextFormatFlags.NoPadding);
+                using (var f = new Font("Segoe UI", 9f))
+                    TextRenderer.DrawText(g, "Takes a few seconds", f, new Rectangle(P(42), P(407), P(386), P(20)), Theme.Muted, TextFormatFlags.NoPadding | TextFormatFlags.Right);
             }
+            else
+                using (var f = new Font("Segoe UI", 9f))
+                {
+                    TextRenderer.DrawText(g, "In game, type /reload to load new prices and /market to open the Market.", f, new Rectangle(P(24), P(406), ClientSize.Width - P(48), P(22)), Theme.Muted, TextFormatFlags.NoPadding | TextFormatFlags.HorizontalCenter);
+                }
         }
 
         void DrawRow(Graphics g, float y, string label, string value, Color c, int maxW)

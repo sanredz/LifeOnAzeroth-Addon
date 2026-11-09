@@ -20,6 +20,14 @@ namespace LifeOnAzeroth
         public long Latest;
         public int Snapshots;
         public int Items;
+        public AppInfo App;
+    }
+
+    public class AppInfo
+    {
+        public string Version;
+        public string Url;
+        public string Sha;
     }
 
     public static class Sync
@@ -309,6 +317,12 @@ namespace LifeOnAzeroth
             return Path.Combine(forever, "Interface", "AddOns", AddonName);
         }
 
+        public static bool HasData(string forever)
+        {
+            string f = Path.Combine(DataDir(forever), "Data.lua");
+            return File.Exists(f) && new FileInfo(f).Length > 1000;
+        }
+
         public static string DataDir(string forever)
         {
             return Path.Combine(forever, "Interface", "AddOns", DataName);
@@ -343,6 +357,59 @@ namespace LifeOnAzeroth
                 if (s == null) return null;
                 using (var ms = new MemoryStream()) { s.CopyTo(ms); return ms.ToArray(); }
             }
+        }
+
+        static AppInfo ParseApp(Dictionary<string, object> m)
+        {
+            var a = Field(m, "app") as Dictionary<string, object>;
+            if (a == null) return null;
+            var info = new AppInfo { Version = Convert.ToString(Field(a, "v"), Inv), Url = Convert.ToString(Field(a, "url"), Inv), Sha = Convert.ToString(Field(a, "sha256"), Inv) };
+            Version tmp;
+            return Version.TryParse(info.Version ?? "", out tmp) ? info : null;
+        }
+
+        public static bool IsUpdate(AppInfo app)
+        {
+            return app != null && Newer(app.Version, Program.Version);
+        }
+
+        public static AppInfo PeekApp(string region)
+        {
+            return ParseApp(Obj(Json(Get("/market/" + region))));
+        }
+
+        static string AppLine(AppInfo app)
+        {
+            return "app = { v = " + LuaStr(Program.Version) + ", latest = " + LuaStr(IsUpdate(app) ? app.Version : Program.Version) + " },\n";
+        }
+
+        public static void MarkApp(string forever, AppInfo app)
+        {
+            try
+            {
+                string file = Path.Combine(DataDir(forever), "Data.lua");
+                if (!File.Exists(file)) return;
+                string text = File.ReadAllText(file);
+                string line = AppLine(app);
+                string head = text.Substring(0, Math.Min(text.Length, 200));
+                var m = System.Text.RegularExpressions.Regex.Match(head, @"^app = \{[^\n]*\},\n", System.Text.RegularExpressions.RegexOptions.Multiline);
+                string next;
+                if (m.Success)
+                {
+                    if (m.Value == line) return;
+                    next = text.Substring(0, m.Index) + line + text.Substring(m.Index + m.Length);
+                }
+                else
+                {
+                    var v = System.Text.RegularExpressions.Regex.Match(head, @"^v = \d+,\n", System.Text.RegularExpressions.RegexOptions.Multiline);
+                    if (!v.Success) return;
+                    next = text.Substring(0, v.Index + v.Length) + line + text.Substring(v.Index + v.Length);
+                }
+                string tmp = file + ".tmp";
+                File.WriteAllText(tmp, next, new UTF8Encoding(false));
+                File.Replace(tmp, file, null);
+            }
+            catch { }
         }
 
         public static long PeekLatest(string region)
@@ -413,13 +480,17 @@ namespace LifeOnAzeroth
             var markets = new Dictionary<string, Dictionary<string, object>>();
             var own = Obj(Json(Get("/market/" + region)));
             markets[region] = own;
+            var app = ParseApp(own);
             var state = Obj(Field(own, "state"));
             var T = Arr(Field(state, "t")).Select(Lng).ToArray();
             if (T.Length == 0) throw new Exception("No market data for this region yet.");
             long latest = T[T.Length - 1];
             string dataFile = Path.Combine(DataDir(forever), "Data.lua");
             if (latest == lastLatest && File.Exists(dataFile) && new FileInfo(dataFile).Length > 1000 && DataFormat(dataFile) == Format)
-                return new SyncResult { Changed = false, Latest = latest, Snapshots = T.Length };
+            {
+                MarkApp(forever, app);
+                return new SyncResult { Changed = false, Latest = latest, Snapshots = T.Length, App = app };
+            }
 
             progress("Downloading the item catalog", 0.06);
             var cat = Obj(Json(Get("/catalog")));
@@ -498,7 +569,7 @@ namespace LifeOnAzeroth
             progress("Writing the addon data", 0.95);
             var sb = new StringBuilder(4 << 20);
             long built = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
-            sb.Append("LOA_DATA = {\nv = ").Append(Format).Append(",\nbuilt = ").Append(built).Append(",\nlatest = ").Append(latest).Append(",\nregion = ").Append(LuaStr(region)).Append(",\n");
+            sb.Append("LOA_DATA = {\nv = ").Append(Format).Append(",\n").Append(AppLine(app)).Append("built = ").Append(built).Append(",\nlatest = ").Append(latest).Append(",\nregion = ").Append(LuaStr(region)).Append(",\n");
             sb.Append("defs = {\n");
             foreach (var o in Arr(Field(own, "defs")))
             {
@@ -548,7 +619,7 @@ namespace LifeOnAzeroth
             File.WriteAllText(tmp, sb.ToString(), new UTF8Encoding(false));
             if (File.Exists(dataFile)) File.Replace(tmp, dataFile, null); else File.Move(tmp, dataFile);
             progress("Done", 1);
-            return new SyncResult { Changed = true, Built = built, Latest = latest, Snapshots = T.Length, Items = itemCount };
+            return new SyncResult { Changed = true, Built = built, Latest = latest, Snapshots = T.Length, Items = itemCount, App = app };
         }
     }
 }

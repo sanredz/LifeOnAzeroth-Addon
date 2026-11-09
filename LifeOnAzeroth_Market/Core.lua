@@ -322,6 +322,21 @@ function NS.ago(t)
   return d .. (d == 1 and " day ago" or " days ago")
 end
 
+local function verNum(v)
+  local a, b, c = string.match(type(v) == "string" and v or "", "^(%d+)%.(%d+)%.?(%d*)")
+  if not a then return nil end
+  return tonumber(a) * 1000000 + tonumber(b) * 1000 + (tonumber(c) or 0)
+end
+
+function NS.appUpdate()
+  local d = LOA_DATA
+  if type(d) ~= "table" then return nil end
+  local a = d.app
+  if type(a) ~= "table" then return "" end
+  local have, latest = verNum(a.v), verNum(a.latest)
+  if have and latest and latest > have then return a.latest end
+end
+
 function NS.fmtTime(t, span)
   if span > 3 * 86400 then return date("%b %d", t) end
   if span > 18 * 3600 then return date("%b %d, %H:%M", t) end
