@@ -141,11 +141,23 @@ function V.flow(id, hk)
   return out / hours * 24, value / hours * 24
 end
 
+local sellCache = {}
+local function clientSell(id)
+  local v = sellCache[id]
+  if v ~= nil then return v or nil end
+  local ok, _, _, _, _, _, _, _, _, _, _, sell = pcall(GetItemInfo, id)
+  if ok and type(sell) == "number" then
+    sellCache[id] = sell
+    return sell
+  end
+  return nil
+end
+
 function V.item(id, count, hk)
   local D = NS.Ensure()
   if not D then return nil end
   local cat = D.cat and D.cat[id]
-  local r = { id = id, n = count or 1, name = cat and cat[1], q = cat and cat[2], vendor = cat and cat[7] or 0 }
+  local r = { id = id, n = count or 1, name = cat and cat[1], q = cat and cat[2], vendor = clientSell(id) or (cat and cat[7]) or 0 }
   local l
   if hk then
     local H = D.houses and D.houses[hk]
@@ -197,9 +209,13 @@ function V.holdings(scope)
             local free = e[1] or 0
             if free > 0 then
               local s = sum[id]
-              if not s then s = { n = 0, where = {} } sum[id] = s end
+              if not s then s = { n = 0, where = {}, on = {} } sum[id] = s end
               s.n = s.n + free
               s.where[where] = true
+              local nm = c.name or key:match("^([^-]+)") or "?"
+              s.on[nm] = (s.on[nm] or 0) + free
+              s.cls = s.cls or {}
+              s.cls[nm] = c.class
             end
           end
         end
@@ -210,6 +226,11 @@ function V.holdings(scope)
     local r = V.item(id, s.n)
     if r then
       r.where = s.where
+      local on = {}
+      for nm, n in pairs(s.on) do on[#on + 1] = { nm, n, s.cls and s.cls[nm] } end
+      table.sort(on, function(a, b) return a[2] > b[2] end)
+      r.on = on
+      r.onName = on[1] and on[1][1] or ""
       out[#out + 1] = r
     end
   end

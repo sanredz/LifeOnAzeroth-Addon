@@ -338,7 +338,9 @@ function NS.OpenItem(id, rg)
   c.stats[1].v:SetText(l and NS.coin(math.min(l[2] > 0 and l[2] or l[1], l[1])) or "\226\128\147")
   c.stats[2].v:SetText(l and NS.fmt(l[4]) or "0")
   c.stats[3].v:SetText(l and NS.fmt(l[3]) or "0")
-  c.stats[4].v:SetText(cat[7] and cat[7] > 0 and NS.coin(cat[7]) or "\226\128\147")
+  local okS, _, _, _, _, _, _, _, _, _, _, sell = pcall(GetItemInfo, id)
+  if not okS or type(sell) ~= "number" then sell = cat[7] end
+  c.stats[4].v:SetText(sell and sell > 0 and NS.coin(sell) or "\226\128\147")
 
   local priced, minP, minN, lowRg = {}, math.huge, 0, nil
   local lAll = NS.latestAll(rg, id)

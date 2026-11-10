@@ -7,11 +7,27 @@ local MAIL_DAYS = 30
 
 local function now() return time() end
 
+local function fullName()
+  if not UnitName then return nil end
+  local first, second = UnitName("player")
+  if type(first) ~= "string" or first == "" then return nil end
+  local realm = GetRealmName and GetRealmName()
+  if type(second) == "string" and second ~= "" and second ~= realm then
+    local c = Constants and Constants.CharacterNameSeparatorConsts
+    local sep = c and type(c.CHARACTERNAME_SURNAME_SEPARATOR) == "string" and c.CHARACTERNAME_SURNAME_SEPARATOR ~= "" and c.CHARACTERNAME_SURNAME_SEPARATOR or " "
+    return first .. sep .. second, first
+  end
+  return first, first
+end
+
 local function charKey()
   local n = UnitName and UnitName("player")
   local r = GetRealmName and GetRealmName()
   if not n or not r then return nil end
-  return n .. "-" .. r
+  local okG, guid = pcall(UnitGUID, "player")
+  local old = n .. "-" .. r
+  if okG and type(guid) == "string" and guid ~= "" then return guid, old, n, r end
+  return old, old, n, r
 end
 
 function L.db()
@@ -25,13 +41,24 @@ function L.db()
 end
 
 function L.me()
-  local db, k = L.db(), charKey()
+  local db = L.db()
+  local k, old, n, r = charKey()
   if not db or not k then return nil end
   local c = db.chars[k]
+  if not c and old ~= k and db.chars[old] and not db.chars[old].guid then
+    c = db.chars[old]
+    db.chars[old] = nil
+    db.chars[k] = c
+    for _, e in ipairs(db.ledger or {}) do if e.c == old then e.c = k end end
+  end
   if not c then
     c = { gold = {} }
     db.chars[k] = c
   end
+  if k ~= old then c.guid = k end
+  c.name, c.realm = fullName() or n, r
+  local okC, _, cls = pcall(UnitClass, "player")
+  if okC and type(cls) == "string" then c.class = cls end
   c.gold = c.gold or {}
   if NS.myHouse then c.house = NS.myHouse() or c.house end
   return c, k
@@ -149,11 +176,11 @@ function L.IdByName(name)
 end
 
 local function vendorOf(id)
+  local ok, _, _, _, _, _, _, _, _, _, _, sell = pcall(GetItemInfo, id)
+  if ok and type(sell) == "number" then return sell end
   local D = NS.Ensure and NS.Ensure()
   local c = D and D.cat and D.cat[id]
-  if c and c[7] and c[7] > 0 then return c[7] end
-  local ok, _, _, _, _, _, _, _, _, _, _, sell = pcall(GetItemInfo, id)
-  return ok and sell or nil
+  return c and c[7] or nil
 end
 
 local function itemIdAt(loc)
@@ -264,12 +291,16 @@ local function onSendMail(to)
   local db = L.db()
   local c, me = L.me()
   if not db or not c or type(to) ~= "string" or to == "" then return end
-  local key = to:find("-", 1, true) and to or (to .. "-" .. (GetRealmName and GetRealmName() or ""))
-  local r
+  local name, realm = to:match("^([^-]+)-(.+)$")
+  name = string.lower(name or to)
+  realm = string.lower(realm or (GetRealmName and GetRealmName() or ""))
+  local r, found = nil, 0
   for k, v in pairs(db.chars) do
-    if k ~= me and string.lower(k) == string.lower(key) then r = v break end
+    local vn, vr = v.name, v.realm
+    if not vn then vn, vr = k:match("^([^-]+)-(.+)$") end
+    if k ~= me and vn and string.lower(vn) == name and string.lower(vr or "") == realm then r = v found = found + 1 end
   end
-  if not r then return end
+  if found ~= 1 then return end
   local okM, mny = pcall(GetSendMailMoney)
   local tr = { t = now(), from = me, g = okM and mny or 0, items = {} }
   for a = 1, (ATTACHMENTS_MAX_SEND or 12) do

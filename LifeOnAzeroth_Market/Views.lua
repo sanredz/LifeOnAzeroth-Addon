@@ -6,6 +6,12 @@ local current = "market"
 
 local BLUE = { 0.42, 0.66, 0.98 }
 
+local function classed(name, cls)
+  local c = cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]
+  if c and c.r then return NS.color({ c.r, c.g, c.b }, name) end
+  return NS.color(NS.COL.ink2, name)
+end
+
 local PICK = {
   ah = { "Auction", NS.COL.up },
   vendor = { "Vendor", NS.COL.gold },
@@ -174,6 +180,11 @@ local function itemTip(row)
   if r.net then tipLine("Sells for, after the AH cut", NS.coin(math.floor(r.net))) end
   tipLine("Vendor pays", r.vendor > 0 and NS.coin(r.vendor) or "nothing")
   if r.perDay then tipLine(r.sales and "Sold per day" or "Left the AH per day", NS.fmt(math.floor(r.perDay + 0.5))) end
+  if r.on and #r.on > 1 then
+    local t = {}
+    for _, x in ipairs(r.on) do t[#t + 1] = classed(x[1], x[3]) .. " " .. NS.fmt(x[2]) end
+    tipLine("On " .. table.concat(t, " \194\183 "))
+  end
   local g, u = NS.COL.up, NS.COL.gold
   if r.pick == "ah" then
     GameTooltip:AddLine("Auction it: about " .. NS.coin(math.floor(r.gain)) .. " more than vendoring.", g[1], g[2], g[3], true)
@@ -212,7 +223,8 @@ local function buildItems(parent)
   v.sum:SetJustifyH("RIGHT")
   local W = 1028
   local cols = {
-    { title = "ITEM", x = 8, w = 320, icon = true, sort = "name", desc = false },
+    { title = "ITEM", x = 8, w = 216, icon = true, sort = "name", desc = false },
+    { title = "", x = 232, w = 96, sort = "onName", desc = false, size = 11 },
     { title = "QTY", x = 336, w = 48, right = true, sort = "n" },
     { title = "SELLS FOR", x = 392, w = 100, right = true, sort = "net" },
     { title = "VENDOR", x = 500, w = 92, right = true, sort = "vendor" },
@@ -227,8 +239,27 @@ local function buildItems(parent)
   v.list.sortKey, v.list.sortDesc = "gain", true
   v.list.onSort = function() NS.PaintViews() end
   v.list.onEnter = itemTip
+  v.chars = CreateFrame("Button", nil, v)
+  v.chars:SetPoint("BOTTOMLEFT", 0, 0)
+  v.chars:SetHeight(16)
+  v.chars.t = NS.text(v.chars, 11, NS.COL.gold)
+  v.chars.t:SetPoint("LEFT")
+  v.chars:SetScript("OnEnter", function(self)
+    self.t:SetTextColor(NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:AddLine("Characters included", NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
+    for _, ch in ipairs(self.list or {}) do
+      local note = ch.noBags and NS.color(NS.COL.muted, "  bags not read yet") or ch.noBank and NS.color(NS.COL.muted, "  bank not opened") or ""
+      GameTooltip:AddDoubleLine(ch.label .. note, NS.coin(math.floor(ch.worth)), 1, 1, 1, 1, 1, 1)
+    end
+    if #(self.list or {}) < 2 then
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddLine("Log in on your alts with the addon enabled to add them. Characters on another WoW account are kept separately.", NS.COL.muted[1], NS.COL.muted[2], NS.COL.muted[3], true)
+    end
+    GameTooltip:Show()
+  end)
+  v.chars:SetScript("OnLeave", function(self) self.t:SetTextColor(NS.COL.gold[1], NS.COL.gold[2], NS.COL.gold[3]) GameTooltip:Hide() end)
   v.foot = NS.text(v, 11, NS.COL.muted)
-  v.foot:SetPoint("BOTTOMLEFT", 0, 2)
   v.foot:SetPoint("BOTTOMRIGHT", 0, 2)
   v.foot:SetJustifyH("LEFT")
   return v
@@ -260,7 +291,8 @@ local function paintItems(v)
   end
   local salesKnown = false
   for _, r in ipairs(list) do if r.sales then salesKnown = true break end end
-  v.list.heads[5].col.title = salesKnown and "SOLD/DAY" or "LEFT AH/DAY"
+  v.list.heads[6].col.title = salesKnown and "SOLD/DAY" or "LEFT AH/DAY"
+  v.list.heads[2].col.title = who == "All" and "ON" or ""
   v.salesKnown = salesKnown
   sortBy(list, v.list.sortKey, v.list.sortDesc)
   v.sum:SetText("Worth " .. NS.color(NS.COL.ink, NS.coin(math.floor(worth))) .. "   \194\183   auctioning " .. ahN .. (ahN == 1 and " item" or " items") .. " adds " .. NS.color(NS.COL.up, NS.coin(math.floor(gain))) .. " over vendoring")
@@ -278,18 +310,42 @@ local function paintItems(v)
     local qc = NS.QC[r.q] or NS.COL.ink
     cl[1]:SetTextColor(qc[1], qc[2], qc[3])
     cl[1]:SetText(r.name ~= "" and r.name or ("Item " .. r.id))
-    cl[2]:SetText(NS.fmt(r.n))
+    local on = ""
+    if who == "All" and r.on and r.on[1] then on = classed(r.on[1][1], r.on[1][3]) .. (#r.on > 1 and NS.color(NS.COL.muted, " +" .. (#r.on - 1)) or "") end
+    cl[2]:SetText(on)
+    cl[3]:SetText(NS.fmt(r.n))
     local dash = NS.color(NS.COL.muted, "\226\128\147")
-    cl[3]:SetText(r.net and NS.coin(math.floor(r.net)) or NS.color(NS.COL.muted, "not listed"))
-    cl[4]:SetText(r.vendor > 0 and NS.coin(r.vendor) or dash)
-    cl[5]:SetText(r.perDay and NS.fmt(math.floor(r.perDay + 0.5)) or dash)
-    cl[6]:SetText(r.total > 0 and NS.coin(math.floor(r.total)) or dash)
-    cl[7]:SetText(r.gain >= 1 and NS.color(NS.COL.up, "+" .. NS.coin(math.floor(r.gain))) or dash)
+    cl[4]:SetText(r.net and NS.coin(math.floor(r.net)) or NS.color(NS.COL.muted, "not listed"))
+    cl[5]:SetText(r.vendor > 0 and NS.coin(r.vendor) or dash)
+    cl[6]:SetText(r.perDay and NS.fmt(math.floor(r.perDay + 0.5)) or dash)
+    cl[7]:SetText(r.total > 0 and NS.coin(math.floor(r.total)) or dash)
+    cl[8]:SetText(r.gain >= 1 and NS.color(NS.COL.up, "+" .. NS.coin(math.floor(r.gain))) or dash)
     local p = PICK[r.pick] or PICK.none
-    cl[8]:SetText(NS.color(p[2], p[1]))
+    cl[9]:SetText(NS.color(p[2], p[1]))
   end, empty)
   local parts = {}
-  if c then
+  v.foot:ClearAllPoints()
+  v.foot:SetPoint("BOTTOMRIGHT", 0, 2)
+  if who == "All" then
+    local worthBy = {}
+    for _, r in ipairs(list) do
+      for _, x in ipairs(r.on or {}) do worthBy[x[1]] = (worthBy[x[1]] or 0) + r.total * x[2] / math.max(1, r.n) end
+    end
+    local chars = {}
+    for k, ch in pairs(NS.db.chars or {}) do
+      local nm = ch.name or k:match("^([^-]+)") or "?"
+      chars[#chars + 1] = { label = classed(nm, ch.class), worth = worthBy[nm] or 0, noBags = not ch.bagsT, noBank = where ~= "Bags" and not ch.bankT }
+    end
+    table.sort(chars, function(a, b) return a.worth > b.worth end)
+    v.chars.list = chars
+    v.chars.t:SetText(#chars .. (#chars == 1 and " character" or " characters") .. " |TInterface\\FriendsFrame\\InformationIcon:12:12:0:0|t")
+    v.chars:SetWidth(v.chars.t:GetStringWidth() + 4)
+    v.chars:Show()
+    v.foot:SetPoint("BOTTOMLEFT", v.chars, "BOTTOMRIGHT", 0, 2)
+    parts[#parts + 1] = ""
+  elseif c then
+    v.chars:Hide()
+    v.foot:SetPoint("BOTTOMLEFT", 0, 2)
     parts[#parts + 1] = "Bags read " .. (c.bagsT and NS.ago(c.bagsT) or "never")
     parts[#parts + 1] = "bank " .. (c.bankT and NS.ago(c.bankT) or "not opened yet")
   end
@@ -297,6 +353,10 @@ local function paintItems(v)
   parts[#parts + 1] = "soulbound items are left out"
   if hidden > 0 then parts[#parts + 1] = hidden .. " junk " .. (hidden == 1 and "item" or "items") .. " hidden" end
   if not v.salesKnown and #list > 0 then parts[#parts + 1] = "update the companion app to count real sales" end
+  if who ~= "All" and not c then
+    v.chars:Hide()
+    v.foot:SetPoint("BOTTOMLEFT", 0, 2)
+  end
   v.foot:SetText(table.concat(parts, "  \194\183  ") .. ".")
 end
 
