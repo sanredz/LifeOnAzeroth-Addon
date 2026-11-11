@@ -28,7 +28,7 @@ namespace LifeOnAzeroth
 {
     static partial class Program
     {
-        public const string Version = "1.0.6";
+        public const string Version = "1.0.7";
         public static int ShowMsg;
 
         [DllImport("user32.dll")] static extern int RegisterWindowMessage(string msg);

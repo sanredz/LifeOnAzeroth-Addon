@@ -2,7 +2,7 @@
 ## Title: Life on Azeroth: |cffffe08aMarket|r
 ## Notes: The Life on Azeroth auction house market in game: price indexes, item search and history. Prices come from the Life on Azeroth companion app. /market to open.
 ## Author: sanredz
-## Version: 1.0.7
+## Version: 1.0.8
 ## IconTexture: Interface\Icons\INV_Misc_Coin_17
 ## SavedVariables: LifeOnAzeroth_MarketDB
 ## OptionalDeps: LifeOnAzeroth_Data

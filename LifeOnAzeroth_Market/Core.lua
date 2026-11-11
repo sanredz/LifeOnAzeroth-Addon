@@ -115,6 +115,19 @@ function NS.Ensure()
   for _, R in pairs(D.houses or {}) do
     R.lat = parseLat(R.latS)
     R.latS = nil
+    if R.sellS then
+      R.sell = {}
+      for line in string.gmatch(R.sellS .. "\n", "([^\n]*)\n") do
+        local f = splitFields(line, ",")
+        local id = tonumber(f[1])
+        if id then
+          local c = {}
+          for i = 1, 4 + 2 * #NS.STEPN do c[i] = tonumber(f[i + 1]) or 0 end
+          R.sell[id] = c
+        end
+      end
+      R.sellS = nil
+    end
   end
   D.catS, D.latS = nil, nil
   D.ready = true
@@ -180,6 +193,57 @@ function NS.idx(key)
   local v = NS.decodeNums(V.idx[key], 10)
   idxCache[ck] = { src = V.idx[key], v = v }
   return v
+end
+
+function NS.sellCounts(id, hk)
+  local V
+  if hk then V = LOA_DATA and LOA_DATA.houses and LOA_DATA.houses[hk] else V = NS.view() end
+  return V and V.sell and V.sell[id] or nil, V and V.sell ~= nil
+end
+
+NS.STEPS = { 0.7, 0.9, 1, 1.1, 1.25, 1.5 }
+NS.STEPN = { "under 70%", "70-90%", "90-100%", "100-110%", "110-125%", "125-150%", "over 150%" }
+
+function NS.stepOf(ratio)
+  local k = 1
+  while k <= #NS.STEPS and (k <= 2 and ratio >= NS.STEPS[k] or k > 2 and ratio > NS.STEPS[k]) do k = k + 1 end
+  return k
+end
+
+function NS.stepRate(sc, k)
+  local S = #NS.STEPN
+  local s, e = sc[4 + k] or 0, sc[4 + S + k] or 0
+  if s + e > 0 then return s / (s + e), s, s + e end
+end
+
+function NS.chanceColor(p)
+  if p >= 0.8 then return NS.COL.up end
+  if p >= 0.5 then return { 0.973, 0.827, 0.42 } end
+  return NS.COL.dn
+end
+
+function NS.sellTip(sc, mine)
+  if not sc then return end
+  local m = NS.COL.muted
+  local S = #NS.STEPN
+  local function line(label, s, e, hl)
+    local n = s + e
+    local c = hl and NS.COL.title or { 1, 1, 1 }
+    GameTooltip:AddDoubleLine(label, n > 0 and (math.floor(100 * s / n + 0.5) .. "%  " .. NS.color(m, NS.fmt(s) .. " of " .. NS.fmt(n))) or NS.color(m, "none ended yet"), c[1], c[2], c[3], 1, 1, 1)
+  end
+  GameTooltip:AddLine(" ")
+  GameTooltip:AddLine("Sell rate, last 7 days", NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
+  line("Overall", sc[1] + sc[2], sc[3] + sc[4])
+  local any = false
+  for k = 1, S do if (sc[4 + k] or 0) + (sc[4 + S + k] or 0) > 0 then any = true end end
+  if any then
+    GameTooltip:AddLine("Listed at, vs the typical price", m[1], m[2], m[3])
+    for k = 1, S do line("  " .. NS.STEPN[k], sc[4 + k] or 0, sc[4 + S + k] or 0, k == mine) end
+  else
+    line("At or below typical price", sc[1], sc[3])
+    line("Above typical price", sc[2], sc[4])
+  end
+  GameTooltip:AddLine("Finished auctions on this auction house that sold instead of running out, by their price against the typical price in the last hour they were listed. A cancelled auction counts as sold.", m[1], m[2], m[3], true)
 end
 
 local histCache = {}

@@ -181,6 +181,15 @@ function V.item(id, count, hk)
     r.sales = sales and true or false
     local ahead = sales and (r.auctions + 1) or (r.listed + r.n)
     r.chance = (r.perDay and r.perDay > 0) and math.min(1, r.perDay * LISTING_DAYS / ahead) or 0
+    local sc = NS.sellCounts(id, hk)
+    if sc then
+      r.sellCounts = sc
+      local n = sc[1] + sc[2] + sc[3] + sc[4]
+      r.step = NS.stepOf(r.price / r.typical)
+      r.sellStep = NS.stepRate(sc, r.step)
+      r.sellRate = r.sellStep or (n > 0 and (sc[1] + sc[2]) / n or nil)
+      if r.sellRate then r.chance = r.sellRate end
+    end
     local ifUnsold = r.vendor - (r.depUnit or 0)
     r.ahEv = r.chance * r.net + (1 - r.chance) * ifUnsold
     if r.ahEv > r.vendor then

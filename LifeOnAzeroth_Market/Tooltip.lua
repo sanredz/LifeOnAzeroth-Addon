@@ -17,9 +17,11 @@ local function addLines(tooltip, data)
   if not ok or type(id) ~= "number" then return end
   local D = NS.Ensure()
   if not D or not D.cat or not D.cat[id] then return end
-  local l = NS.latest(D.region, id)
+  local own = NS.myHouse()
+  local rs = own and D.houses and D.houses[own] and own or NS.ruleset()
+  local H = rs and D.houses and D.houses[rs]
+  local l = H and H.lat and H.lat[id] or (not H and NS.latest(D.region, id))
   if not l or not l[1] or l[1] <= 0 then return end
-  local rs = NS.ruleset()
   local where = rs and NS.houseName(rs, true) or NS.REGION_NAME[D.region] or string.upper(D.region or "")
   local g, gd = NS.COL.title2, NS.COL.ink2
   tooltip:AddLine(" ")
@@ -28,6 +30,10 @@ local function addLines(tooltip, data)
   local n = stackCount(tooltip)
   if n > 1 then
     tooltip:AddDoubleLine("Stack of " .. n, NS.coin(l[1] * n), gd[1], gd[2], gd[3], 1, 1, 1)
+  end
+  local okF, perDay, _, sales = pcall(NS.Value.flow, id, rs)
+  if okF and perDay then
+    tooltip:AddDoubleLine(sales and "Sold per day" or "Left the AH per day", perDay >= 10 and NS.fmt(math.floor(perDay + 0.5)) or string.format("%.1f", perDay), gd[1], gd[2], gd[3], 1, 1, 1)
   end
   tooltip:Show()
 end

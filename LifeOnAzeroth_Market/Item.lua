@@ -38,6 +38,125 @@ local function listRow(parent, h)
   return r
 end
 
+local GOLD = { 0.788, 0.635, 0.29 }
+
+local function bar(parent)
+  local b = CreateFrame("Frame", nil, parent)
+  b:SetHeight(5)
+  NS.fill(b, 1, 1, 1, 0.07):SetAllPoints()
+  b.f = b:CreateTexture(nil, "ARTWORK")
+  b.f:SetPoint("TOPLEFT")
+  b.f:SetPoint("BOTTOMLEFT")
+  b.f:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 1)
+  b.p = 0
+  function b:Set(p)
+    self.p = p or 0
+    local w = self:GetWidth()
+    if self.p <= 0 or w <= 0 then self.f:Hide() return end
+    self.f:SetWidth(math.max(1, w * self.p))
+    self.f:Show()
+  end
+  b:SetScript("OnSizeChanged", function(self) self:Set(self.p) end)
+  return b
+end
+
+function NS.SellBox(parent)
+  local b = box(parent, "Does it sell?")
+  b.sub = NS.text(b, 10, NS.COL.muted)
+  b.sub:SetPoint("LEFT", b.title, "RIGHT", 6, -1)
+  b.sub:SetText("last 7 days")
+  b.ovL = NS.text(b, 12, NS.COL.ink)
+  b.ovL:SetPoint("TOPLEFT", 12, -34)
+  b.ovL:SetText("Overall")
+  b.ovP = NS.text(b, 13, NS.COL.ink)
+  b.ovP:SetPoint("TOPRIGHT", -12, -33)
+  b.ovB = bar(b)
+  b.ovB:SetPoint("TOPLEFT", 12, -50)
+  b.ovB:SetPoint("TOPRIGHT", -12, -50)
+  b.ovN = NS.text(b, 10, NS.COL.muted)
+  b.ovN:SetPoint("TOPLEFT", 12, -60)
+  b.hL = NS.text(b, 9, NS.COL.muted)
+  b.hL:SetPoint("TOPLEFT", 12, -80)
+  b.hL:SetText("LISTED AT")
+  b.hR = NS.text(b, 9, NS.COL.muted)
+  b.hR:SetPoint("TOPRIGHT", -12, -80)
+  b.hR:SetText("SOLD")
+  b.rows = {}
+  for k = 1, #NS.STEPN do
+    local y = -94 - (k - 1) * 16
+    local r = { y = y }
+    r.l = NS.text(b, 11, NS.COL.ink)
+    r.l:SetPoint("TOPLEFT", 12, y)
+    r.b = bar(b)
+    r.p = NS.text(b, 11, NS.COL.ink)
+    r.p:SetPoint("TOPRIGHT", -62, y)
+    r.p:SetJustifyH("RIGHT")
+    r.n = NS.text(b, 10, NS.COL.muted)
+    r.n:SetPoint("TOPRIGHT", -12, y)
+    r.n:SetJustifyH("RIGHT")
+    b.rows[k] = r
+  end
+  b.mid = NS.text(b, 11, NS.COL.ink)
+  b.mid:SetWordWrap(true)
+  b.mid:SetJustifyV("TOP")
+  b.none = NS.text(b, 11, NS.COL.muted)
+  b.none:SetPoint("TOPLEFT", 12, -36)
+  b.none:SetPoint("RIGHT", -12, 0)
+  b.none:SetWordWrap(true)
+  b.none:SetText("No auctions of this have ended here yet.")
+  b:SetHeight(94 + #NS.STEPN * 16 + 34)
+  function b:Fill(sc, mine)
+    local S = #NS.STEPN
+    local n = sc and (sc[1] + sc[2] + sc[3] + sc[4]) or 0
+    for _, x in ipairs({ self.ovL, self.ovP, self.ovB, self.ovN, self.hL, self.hR, self.mid }) do x:SetShown(n > 0) end
+    self.none:SetShown(n == 0)
+    for _, r in ipairs(self.rows) do r.l:Hide() r.b:Hide() r.p:Hide() r.n:Hide() end
+    if n == 0 then return end
+    local s0 = sc[1] + sc[2]
+    self.ovP:SetText(math.floor(100 * s0 / n + 0.5) .. "%")
+    self.ovB:Set(s0 / n)
+    self.ovN:SetText(NS.fmt(s0) .. " of " .. NS.fmt(n) .. " sold")
+    local ladder = 0
+    for k = 1, 2 * S do ladder = ladder + (sc[4 + k] or 0) end
+    local lines = {}
+    if ladder > 0 then
+      for k = 1, S do lines[k] = { NS.STEPN[k], sc[4 + k] or 0, sc[4 + S + k] or 0, k == mine } end
+    else
+      lines = { { "At or below typical", sc[1], sc[3], mine ~= nil and mine <= 3 }, { "Above typical", sc[2], sc[4], mine ~= nil and mine > 3 } }
+    end
+    local lw = ladder > 0 and 74 or 130
+    for k, ln in ipairs(lines) do
+      local r = self.rows[k]
+      local m = ln[2] + ln[3]
+      local c = ln[4] and NS.COL.title or (m > 0 and NS.COL.ink or NS.COL.muted)
+      r.l:SetText(ln[1])
+      r.l:SetTextColor(c[1], c[2], c[3])
+      r.b:ClearAllPoints()
+      r.b:SetPoint("TOPLEFT", 12 + lw, r.y - 4)
+      r.b:SetPoint("TOPRIGHT", -104, r.y - 4)
+      r.b:Set(m > 0 and ln[2] / m or 0)
+      r.p:SetText(m > 0 and (math.floor(100 * ln[2] / m + 0.5) .. "%") or "\226\128\147")
+      r.n:SetText(m > 0 and (NS.fmt(ln[2]) .. "/" .. NS.fmt(m)) or "")
+      r.l:Show() r.b:Show() r.p:Show() r.n:Show()
+    end
+    self.hL:SetShown(ladder > 0)
+    self.hR:SetShown(ladder > 0)
+    local nA, nB = sc[1] + sc[3], sc[2] + sc[4]
+    if nA > 0 and nB > 0 then
+      local pa, pb = math.floor(100 * sc[1] / nA + 0.5), math.floor(100 * sc[2] / nB + 0.5)
+      local d = pa - pb
+      self.mid:SetText("Priced above typical, it sells " .. NS.color(NS.COL.title, d > 0 and (d .. " points less often") or "just as often") .. " (" .. pb .. "% vs " .. pa .. "%).")
+      self.mid:ClearAllPoints()
+      self.mid:SetPoint("TOPLEFT", 12, -94 - #lines * 16 - 2)
+      self.mid:SetPoint("TOPRIGHT", -12, -94 - #lines * 16 - 2)
+      self.mid:Show()
+    else
+      self.mid:Hide()
+    end
+  end
+  return b
+end
+
 local function build()
   local main = NS.Main()
   local ov = CreateFrame("Button", nil, main)
@@ -104,6 +223,17 @@ local function build()
   c.pxLabel = NS.text(hero, 10, NS.COL.muted)
   c.pxLabel:SetPoint("TOPRIGHT", -54, -18)
   c.pxLabel:SetJustifyH("RIGHT")
+  local hint = CreateFrame("Frame", nil, hero)
+  hint:SetPoint("TOPRIGHT", -54, -14)
+  hint:SetSize(240, 40)
+  hint:EnableMouse(true)
+  hint:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+    GameTooltip:AddLine("Typical price", NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
+    GameTooltip:AddLine("The middle price per item of everything listed right now: half the listings are cheaper, half are dearer. A few silly prices barely move it.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  hint:SetScript("OnLeave", function() GameTooltip:Hide() end)
   c.px = NS.text(hero, 20, { 1, 0.949, 0.812 })
   c.px:SetPoint("TOPRIGHT", -54, -36)
   c.px:SetJustifyH("RIGHT")
@@ -136,9 +266,10 @@ local function build()
     stat(stats, "INV_Misc_Ticket_Tarot_Stack_01", "Auctions"),
     stat(stats, "INV_Misc_Bag_10", "Items for sale"),
     stat(stats, "INV_Misc_Coin_17", "Vendor pays"),
+    stat(stats, "INV_Misc_PocketWatch_01", "Sold per day"),
   }
   stats:SetScript("OnSizeChanged", function(self, w)
-    local sw = (w - 30) / 4
+    local sw = (w - 10 * (#c.stats - 1)) / #c.stats
     for i, s in ipairs(c.stats) do
       s:ClearAllPoints()
       s:SetPoint("TOPLEFT", (i - 1) * (sw + 10), 0)
@@ -184,24 +315,28 @@ local function build()
   local right = CreateFrame("Frame", nil, c)
   right:SetPoint("TOPLEFT", c, "TOPRIGHT", -330, -192)
   right:SetPoint("BOTTOMRIGHT", -20, 18)
+  local sellBox = NS.SellBox(right)
+  sellBox:SetPoint("TOPLEFT")
+  sellBox:SetPoint("TOPRIGHT")
+  c.sell = sellBox
   local regs = box(right, "Price in each region")
-  regs:SetPoint("TOPLEFT")
-  regs:SetPoint("TOPRIGHT")
-  regs:SetHeight(38 + 4 * 40)
+  regs:SetPoint("TOPLEFT", sellBox, "BOTTOMLEFT", 0, -12)
+  regs:SetPoint("TOPRIGHT", sellBox, "BOTTOMRIGHT", 0, -12)
+  regs:SetHeight(34 + 2 * 50 + 4)
   regs.rows = {}
   for i = 1, 4 do
-    local r = listRow(regs, 38)
-    r:SetPoint("TOPLEFT", 6, -34 - (i - 1) * 40)
-    r:SetPoint("TOPRIGHT", -6, -34 - (i - 1) * 40)
-    r.rn = NS.text(r, 13, NS.COL.ink)
+    local r = listRow(regs, 48)
+    local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+    r:SetPoint("TOPLEFT", regs, "TOP", col == 0 and -149 or 2, -34 - row * 50)
+    r:SetSize(147, 48)
+    r.rn = NS.text(r, 12, NS.COL.ink)
     r.rn:SetPoint("TOPLEFT", 8, -5)
     r.tag = NS.text(r, 10, NS.COL.up)
     r.tag:SetPoint("LEFT", r.rn, "RIGHT", 6, 0)
+    r.pr = NS.text(r, 12, NS.COL.ink)
+    r.pr:SetPoint("LEFT", 8, -1)
     r.sub = NS.text(r, 10, NS.COL.muted)
     r.sub:SetPoint("BOTTOMLEFT", 8, 5)
-    r.pr = NS.text(r, 13, NS.COL.ink)
-    r.pr:SetPoint("RIGHT", -8, 0)
-    r.pr:SetJustifyH("RIGHT")
     r:SetScript("OnClick", function(self) if self.rg and self.rg ~= cur.rg then NS.OpenItem(cur.id, self.rg) end end)
     regs.rows[i] = r
   end
@@ -341,6 +476,16 @@ function NS.OpenItem(id, rg)
   local okS, _, _, _, _, _, _, _, _, _, _, sell = pcall(GetItemInfo, id)
   if not okS or type(sell) ~= "number" then sell = cat[7] end
   c.stats[4].v:SetText(sell and sell > 0 and NS.coin(sell) or "\226\128\147")
+  local okF, perDay, _, sales = false
+  if rg == LOA_DATA.region then okF, perDay, _, sales = pcall(NS.Value.flow, id) end
+  if not okF then perDay = nil end
+  c.stats[5].k:SetText(perDay and not sales and "Left the AH per day" or "Sold per day")
+  c.stats[5].v:SetText(perDay and (perDay >= 10 and NS.fmt(math.floor(perDay + 0.5)) or string.format("%.1f", perDay)) or "\226\128\147")
+  local sc = rg == LOA_DATA.region and NS.sellCounts(id) or nil
+  local mine
+  if l and l[1] > 0 then mine = NS.stepOf(math.min(l[2] > 0 and l[2] or l[1], l[1]) / l[1]) end
+  c.sell.sub:SetText(rg == LOA_DATA.region and "last 7 days" or ("downloaded for " .. (NS.REGION_NAME[LOA_DATA.region] or "your region") .. " only"))
+  c.sell:Fill(sc, mine)
 
   local priced, minP, minN, lowRg = {}, math.huge, 0, nil
   local lAll = NS.latestAll(rg, id)
@@ -389,7 +534,8 @@ function NS.OpenItem(id, rg)
   end
   table.sort(kin, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[1] < b[1] end)
   card:Show()
-  local fit = math.max(1, math.floor((c.kin:GetHeight() - 38) / 31))
+  local fit = math.floor((c.kin:GetHeight() - 38) / 31)
+  c.kin:SetShown(fit >= 1)
   for j, row in ipairs(c.kin.rows) do
     local k = j <= fit and kin[j]
     if k then

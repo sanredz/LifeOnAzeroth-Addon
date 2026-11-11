@@ -180,6 +180,7 @@ local function itemTip(row)
   if r.net then tipLine("Sells for, after the AH cut", NS.coin(math.floor(r.net))) end
   tipLine("Vendor pays", r.vendor > 0 and NS.coin(r.vendor) or "nothing")
   if r.perDay then tipLine(r.sales and "Sold per day" or "Left the AH per day", NS.fmt(math.floor(r.perDay + 0.5))) end
+  NS.sellTip(r.sellCounts, r.step)
   if r.on and #r.on > 1 then
     local t = {}
     for _, x in ipairs(r.on) do t[#t + 1] = classed(x[1], x[3]) .. " " .. NS.fmt(x[2]) end
@@ -223,14 +224,15 @@ local function buildItems(parent)
   v.sum:SetJustifyH("RIGHT")
   local W = 1028
   local cols = {
-    { title = "ITEM", x = 8, w = 216, icon = true, sort = "name", desc = false },
-    { title = "", x = 232, w = 96, sort = "onName", desc = false, size = 11 },
-    { title = "QTY", x = 336, w = 48, right = true, sort = "n" },
-    { title = "SELLS FOR", x = 392, w = 100, right = true, sort = "net" },
-    { title = "VENDOR", x = 500, w = 92, right = true, sort = "vendor" },
-    { title = "SOLD/DAY", x = 600, w = 80, right = true, sort = "perDay" },
-    { title = "WORTH", x = 688, w = 110, right = true, sort = "total" },
-    { title = "GAIN VS VENDOR", x = 806, w = 120, right = true, sort = "gain" },
+    { title = "ITEM", x = 8, w = 196, icon = true, sort = "name", desc = false },
+    { title = "", x = 212, w = 88, sort = "onName", desc = false, size = 11 },
+    { title = "QTY", x = 306, w = 44, right = true, sort = "n" },
+    { title = "SELLS FOR", x = 356, w = 90, right = true, sort = "net" },
+    { title = "VENDOR", x = 452, w = 70, right = true, sort = "vendor" },
+    { title = "SOLD/DAY", x = 528, w = 76, right = true, sort = "perDay" },
+    { title = "SELL CHANCE", x = 616, w = 92, right = true, sort = "sellRate" },
+    { title = "WORTH", x = 716, w = 92, right = true, sort = "total" },
+    { title = "GAIN VS VENDOR", x = 814, w = 112, right = true, sort = "gain" },
     { title = "BEST", x = W - 92, w = 80, sort = "pickN" },
   }
   v.list = makeList(v, cols, 30, function(d) NS.OpenItem(d.id) end)
@@ -318,10 +320,11 @@ local function paintItems(v)
     cl[4]:SetText(r.net and NS.coin(math.floor(r.net)) or NS.color(NS.COL.muted, "not listed"))
     cl[5]:SetText(r.vendor > 0 and NS.coin(r.vendor) or dash)
     cl[6]:SetText(r.perDay and NS.fmt(math.floor(r.perDay + 0.5)) or dash)
-    cl[7]:SetText(r.total > 0 and NS.coin(math.floor(r.total)) or dash)
-    cl[8]:SetText(r.gain >= 1 and NS.color(NS.COL.up, "+" .. NS.coin(math.floor(r.gain))) or dash)
+    cl[7]:SetText(r.sellRate and NS.color(NS.chanceColor(r.sellRate), math.floor(r.sellRate * 100 + 0.5) .. "%") or dash)
+    cl[8]:SetText(r.total > 0 and NS.coin(math.floor(r.total)) or dash)
+    cl[9]:SetText(r.gain >= 1 and NS.color(NS.COL.up, "+" .. NS.coin(math.floor(r.gain))) or dash)
     local p = PICK[r.pick] or PICK.none
-    cl[9]:SetText(NS.color(p[2], p[1]))
+    cl[10]:SetText(NS.color(p[2], p[1]))
   end, empty)
   local parts = {}
   v.foot:ClearAllPoints()

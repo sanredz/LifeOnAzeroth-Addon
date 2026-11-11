@@ -278,6 +278,22 @@ namespace LifeOnAzeroth
             return lines.ToString();
         }
 
+        static string SellLines(Dictionary<string, object> all, string hk)
+        {
+            var lines = new StringBuilder();
+            foreach (var kv in all)
+            {
+                object v;
+                if (!Obj(kv.Value).TryGetValue(hk, out v)) continue;
+                var c = Arr(v);
+                if (c.Length < 4) continue;
+                lines.Append(kv.Key);
+                for (int i = 0; i < c.Length; i++) lines.Append(',').Append(Lng(c[i]));
+                lines.Append('\n');
+            }
+            return lines.ToString();
+        }
+
         static void WriteHist(StringBuilder sb, SortedDictionary<long, long[][]> hist)
         {
             sb.Append("hist = {\n");
@@ -518,6 +534,9 @@ namespace LifeOnAzeroth
                     try { houses[hk] = Obj(Json(Get("/market/" + region + "/house/" + hk))); } catch { }
                 }
 
+            Dictionary<string, object> sellAll = null;
+            try { sellAll = Obj(Json(Get("/sell/" + region))); } catch { }
+
             var keep = Thin(T);
             var HT = keep.Select(i => T[i]).ToArray();
             var wanted = WantedHouses(forever);
@@ -625,6 +644,7 @@ namespace LifeOnAzeroth
                 sb.Append("[").Append(LuaStr(hk)).Append("] = {\n");
                 WriteState(sb, hst);
                 sb.Append("latS = ").Append(LuaStr(LatestLines(Obj(Field(hm, "latest"))))).Append(",\n");
+                if (sellAll != null) sb.Append("sellS = ").Append(LuaStr(SellLines(sellAll, hk))).Append(",\n");
                 if (wanted.Contains(hk)) WriteHist(sb, histH[hk]); else sb.Append("hist = {},\nnohist = true,\n");
                 sb.Append("},\n");
             }
