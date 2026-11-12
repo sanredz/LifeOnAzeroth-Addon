@@ -734,9 +734,28 @@ local function build()
     GameTooltip:Show()
   end)
   rl:SetScript("OnLeave", function(self) NS.setBorderColor(self, NS.COL.gold, 0.35) GameTooltip:Hide() end)
+  local cz = CreateFrame("Button", nil, f)
+  cz:SetSize(100, 28)
+  cz:SetPoint("RIGHT", rl, "LEFT", -8, 0)
+  NS.fill(cz, 0, 0, 0, 0.3):SetAllPoints()
+  NS.border(cz, NS.COL.frame, 1)
+  cz.t = NS.text(cz, 13, NS.COL.ink2)
+  cz.t:SetPoint("CENTER")
+  cz.t:SetText("Customize")
+  cz:SetScript("OnClick", function() NS.ToggleCustomize() end)
+  cz:SetScript("OnEnter", function(self)
+    NS.setBorderColor(self, NS.COL.gold, 0.7)
+    self.t:SetTextColor(NS.COL.ink[1], NS.COL.ink[2], NS.COL.ink[3])
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine("Customize", NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
+    GameTooltip:AddLine("Choose the lines in item tooltips and the columns in Your Items.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  cz:SetScript("OnLeave", function(self) NS.setBorderColor(self, NS.COL.frame, 1) self.t:SetTextColor(NS.COL.ink2[1], NS.COL.ink2[2], NS.COL.ink2[3]) GameTooltip:Hide() end)
+  f.customize = cz
   local ab = CreateFrame("Button", nil, f)
   ab:SetSize(108, 28)
-  ab:SetPoint("RIGHT", rl, "LEFT", -8, 0)
+  ab:SetPoint("RIGHT", cz, "LEFT", -8, 0)
   NS.fill(ab, NS.COL.up[1], NS.COL.up[2], NS.COL.up[3], 0.1):SetAllPoints()
   NS.border(ab, NS.COL.up, 0.4)
   ab.t = NS.text(ab, 13, NS.COL.up)
@@ -901,12 +920,13 @@ local function minimapButton()
     end)
   end)
   b:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
-  b:SetScript("OnClick", function() if IsShiftKeyDown() then ReloadUI() else NS.Toggle() end end)
+  b:SetScript("OnClick", function(_, btn) if btn == "RightButton" then NS.ToggleCustomize() elseif IsShiftKeyDown() then ReloadUI() else NS.Toggle() end end)
   b:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Life on Azeroth", NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
     GameTooltip:AddLine("Click to open The Market.", 1, 1, 1)
     GameTooltip:AddLine("Shift-click to reload and load new prices.", 1, 1, 1)
+    GameTooltip:AddLine("Right-click to customize.", 1, 1, 1)
     local d = LOA_DATA
     if d and d.built then
       GameTooltip:AddLine("Prices " .. NS.ago(d.built) .. ".", NS.COL.muted[1], NS.COL.muted[2], NS.COL.muted[3])
@@ -940,6 +960,7 @@ function NS.OnLoad()
   end)
   if type(NS.db.series) == "table" then st.series = NS.db.series else NS.db.series = st.series end
   minimapButton()
+  if NS.SetupOptions then NS.SetupOptions() end
 end
 
 SLASH_LIFEONAZEROTH1 = "/market"
@@ -949,6 +970,10 @@ SlashCmdList.LIFEONAZEROTH = function(msg)
   if msg == "tooltip" then
     NS.db.tooltip = NS.db.tooltip == false
     DEFAULT_CHAT_FRAME:AddMessage(NS.color(NS.COL.title, "Life on Azeroth:") .. " prices in item tooltips " .. (NS.db.tooltip and "on." or "off."))
+    return
+  end
+  if msg == "options" or msg == "config" or msg == "customize" then
+    NS.ToggleCustomize(true)
     return
   end
   if msg == "minimap" then

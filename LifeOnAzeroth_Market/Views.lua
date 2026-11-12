@@ -118,12 +118,38 @@ local function makeList(parent, cols, rowH, onRow)
         t:SetWordWrap(false)
         r.cells[k] = t
       end
+      r.cells[k]:SetShown(not c.hidden)
     end
     r:SetScript("OnEnter", function(self) self.bg:SetColorTexture(1, 1, 1, 0.05) if L.onEnter then L.onEnter(self) end end)
     r:SetScript("OnLeave", function(self) self.bg:SetColorTexture(1, 1, 1, 0) GameTooltip:Hide() end)
     r:SetScript("OnClick", function(self) if onRow and self.data then onRow(self.data) end end)
     self.rows[i] = r
     return r
+  end
+  function L:Layout()
+    for i, c in ipairs(self.cols) do
+      local b = self.heads[i]
+      b:ClearAllPoints()
+      b:SetPoint("LEFT", c.x, 0)
+      b:SetWidth(c.w)
+      b:SetShown(not c.hidden)
+    end
+    for _, r in ipairs(self.rows) do
+      for k, c in ipairs(self.cols) do
+        local t = r.cells[k]
+        t:ClearAllPoints()
+        if c.icon then
+          r.ic:ClearAllPoints()
+          r.ic:SetPoint("LEFT", c.x, 0)
+          t:SetPoint("LEFT", c.x + self.rowH, 0)
+          t:SetWidth(c.w - self.rowH)
+        else
+          t:SetPoint("LEFT", c.x, 0)
+          t:SetWidth(c.w)
+        end
+        t:SetShown(not c.hidden)
+      end
+    end
   end
   function L:Paint(data, fill, emptyText)
     child:SetWidth(sf:GetWidth())
@@ -224,17 +250,18 @@ local function buildItems(parent)
   v.sum:SetJustifyH("RIGHT")
   local W = 1028
   local cols = {
-    { title = "ITEM", x = 8, w = 196, icon = true, sort = "name", desc = false },
-    { title = "", x = 212, w = 88, sort = "onName", desc = false, size = 11 },
-    { title = "QTY", x = 306, w = 44, right = true, sort = "n" },
-    { title = "SELLS FOR", x = 356, w = 90, right = true, sort = "net" },
-    { title = "VENDOR", x = 452, w = 70, right = true, sort = "vendor" },
-    { title = "SOLD/DAY", x = 528, w = 76, right = true, sort = "perDay" },
-    { title = "SELL CHANCE", x = 616, w = 92, right = true, sort = "sellRate" },
-    { title = "WORTH", x = 716, w = 92, right = true, sort = "total" },
-    { title = "GAIN VS VENDOR", x = 814, w = 112, right = true, sort = "gain" },
-    { title = "BEST", x = W - 92, w = 80, sort = "pickN" },
+    { key = "item", title = "ITEM", x = 8, w = 196, icon = true, sort = "name", desc = false },
+    { key = "on", title = "", x = 212, w = 88, sort = "onName", desc = false, size = 11 },
+    { key = "qty", title = "QTY", x = 306, w = 44, right = true, sort = "n" },
+    { key = "net", title = "SELLS FOR", x = 356, w = 90, right = true, sort = "net" },
+    { key = "vendor", title = "VENDOR", x = 452, w = 70, right = true, sort = "vendor" },
+    { key = "perDay", title = "SOLD/DAY", x = 528, w = 76, right = true, sort = "perDay" },
+    { key = "sellRate", title = "SELL CHANCE", x = 616, w = 92, right = true, sort = "sellRate" },
+    { key = "total", title = "WORTH", x = 716, w = 92, right = true, sort = "total" },
+    { key = "gain", title = "GAIN VS VENDOR", x = 814, w = 112, right = true, sort = "gain" },
+    { key = "pick", title = "BEST", x = W - 92, w = 80, sort = "pickN" },
   }
+  v.W = W
   v.list = makeList(v, cols, 30, function(d) NS.OpenItem(d.id) end)
   v.list:SetPoint("TOPLEFT", 0, -38)
   v.list:SetPoint("BOTTOMRIGHT", 0, 22)
@@ -295,6 +322,7 @@ local function paintItems(v)
   for _, r in ipairs(list) do if r.sales then salesKnown = true break end end
   v.list.heads[6].col.title = salesKnown and "SOLD/DAY" or "LEFT AH/DAY"
   v.list.heads[2].col.title = who == "All" and "ON" or ""
+  NS.LayoutItemCols(v.list, who == "All", v.W)
   v.salesKnown = salesKnown
   sortBy(list, v.list.sortKey, v.list.sortDesc)
   v.sum:SetText("Worth " .. NS.color(NS.COL.ink, NS.coin(math.floor(worth))) .. "   \194\183   auctioning " .. ahN .. (ahN == 1 and " item" or " items") .. " adds " .. NS.color(NS.COL.up, NS.coin(math.floor(gain))) .. " over vendoring")

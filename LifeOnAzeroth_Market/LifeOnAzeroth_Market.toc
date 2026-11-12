@@ -7,6 +7,9 @@
 ## SavedVariables: LifeOnAzeroth_MarketDB
 ## OptionalDeps: LifeOnAzeroth_Data
 ## X-Curse-Project-ID: 1791731
+## AddonCompartmentFunc: LifeOnAzerothMarket_OnCompartmentClick
+## AddonCompartmentFuncOnEnter: LifeOnAzerothMarket_OnCompartmentEnter
+## AddonCompartmentFuncOnLeave: LifeOnAzerothMarket_OnCompartmentLeave
 
 Core.lua
 Chart.lua
@@ -16,3 +19,4 @@ Ledger.lua
 Value.lua
 Views.lua
 Tooltip.lua
+Options.lua
