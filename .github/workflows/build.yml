@@ -45,7 +45,10 @@ jobs:
       CF_API_KEY: ${{ secrets.CF_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - id: toc
+        run: echo "version=$(grep -m1 '^## Version:' LifeOnAzeroth_Market/LifeOnAzeroth_Market.toc | awk '{print $3}' | tr -d '\r')" >> "$GITHUB_OUTPUT"
       - name: Prepare the addon folder for packaging
+        if: format('v{0}', steps.toc.outputs.version) == github.ref_name
         run: |
           PKG="$RUNNER_TEMP/pkg"
           mkdir -p "$PKG"
@@ -63,5 +66,6 @@ jobs:
           git commit -q -m "$GITHUB_REF_NAME"
           git tag "$GITHUB_REF_NAME"
       - uses: BigWigsMods/packager@v2
+        if: format('v{0}', steps.toc.outputs.version) == github.ref_name
         with:
           args: -t ${{ runner.temp }}/pkg
