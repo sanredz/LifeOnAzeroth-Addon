@@ -17,7 +17,7 @@ Auction house prices for WoW: Forever, inside the game. Every auction house in e
 
 It stays out of your way: a couple of lines in your item tooltips, and a window you open when you want the full picture.
 
-![The Market: indexes on the left, a chart comparing them](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/market-2.png)
+![The Market: indexes on the left, a chart comparing them](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/market-3.png)
 
 ## What it does
 
@@ -33,11 +33,11 @@ It stays out of your way: a couple of lines in your item tooltips, and a window 
 - **Search any item** seen on the auction house.
 - **Any auction house:** it opens on your own ruleset and faction, and every other house is one click away.
 
-![Today's movers](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/movers.png)
+![Today's movers](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/movers-2.png)
 
 **Every item has its own page:** typical and cheapest price, auctions up, items for sale, vendor price and sold per day, price history, and **Does it sell?**, which shows how often it actually sold at each price over the last week. Crafted items show what they're made from and whether crafting them is a profit or a loss, and materials show what they're used in.
 
-![An item page with price history, sell rates and crafting](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/item-2.png)
+![An item page with price history, sell rates and crafting](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/item-3.png)
 
 **Your items:** everything in your bags and bank, on one character or all of them, with what it sells for, sold per day, sell chance, what it's worth and whether to auction or vendor it. **Portfolio** tracks your net worth over time.
 
