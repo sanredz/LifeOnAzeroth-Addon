@@ -1,75 +1,82 @@
 # CurseForge page (kept in sync by hand)
 
-Paste into authors.curseforge.com → project → Description (Markdown mode).
+Paste into authors.curseforge.com -> project -> Description (Markdown mode).
 Images load from the public GitHub repo (`media/`), so replacing a file there
 with the same name updates the page.
 
 **Summary (one line):**
 
-> Prices, trends and item history for your own auction house in WoW Forever, right inside the game.
+> Auction house prices, trends and sell rates for your own auction house in WoW: Forever, right in your tooltips.
 
 **Description:**
 
 ```markdown
 # Life on Azeroth: Market
 
-The auction house market from [lifeonazeroth.com](https://lifeonazeroth.com/#economy), inside **WoW Forever**.
+Auction house prices for WoW: Forever, inside the game. Every auction house in every region is read once an hour, so you see what things actually sell for on your own auction house, how prices have moved, and whether something is worth listing at all.
 
-Is Iron Ore cheap right now, or did everyone just undercut each other this morning? Are herbs climbing all week? Is that green sword worth listing, or will it sit there for two days? Open the Market and you'll know before you post.
+It stays out of your way: a couple of lines in your item tooltips, and a window you open when you want the full picture.
 
-**Prices update every hour.** Every auction house in every region is read once an hour, so you're looking at real prices and real history, not a guess from the last time you checked the AH. The last three days are kept hour by hour, and older history is kept at a coarser step so the data stays small.
+![The Market: indexes on the left, a chart comparing them](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/market.png)
 
-> **Found a bug?** If something looks off, please [open an issue](https://github.com/sanredz/LifeOnAzeroth-Addon/issues).
+## What it does
 
-![The Market: indexes on the left, a chart comparing them, and the hover tooltip](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/market.png)
+**Prices in your tooltips.** Hover anything in your bags, the bank, loot or chat to see its typical price on your auction house, the price of the whole stack and how many sell per day. You choose which lines show up and in what order.
 
-## The Market
+![Item tooltip with typical price, sold per day and sell rate](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/tooltip.png)
 
-- **Indexes** work like a stock index. Each one follows a group of items from the day tracking began, starting at 100: the whole market, trade goods, ore and bars, cloth, herbs, potions, green gear by level and more. 70 means prices are about 30% lower than when it started.
-- **Trends at a glance:** every index has a small trend line and its change over the time range you pick on the chart: the last 6 hours, a day, a week, a month or all time. The prices behind them update every hour.
-- **Compare up to five** indexes or items on one chart. Hover the chart to see every line's value at that hour.
-- **Search any item** seen on the auction house and get its typical price, cheapest listing and 24-hour change as you type.
-- **Your picks stay put.** The chart remembers what you were watching the next time you log in.
-- **Prices in item tooltips:** hover anything in your bags, the bank, loot or chat and see its typical price on your auction house, and the price of the whole stack. `/market tooltip` turns it off.
+**The Market window** (`/market`):
 
-## Every item has its own page
+- **Indexes** for the whole market, trade goods, ore, cloth, herbs, consumables, gear and more, with trends over 6 hours, a day, a week, a month or all time.
+- **Today's movers:** what rose and fell the most since yesterday.
+- **Compare up to five** indexes or items on one chart.
+- **Search any item** seen on the auction house.
+- **Any auction house:** it opens on your own ruleset and faction, and every other house is one click away.
 
-Click any item to see:
+![Today's movers](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/movers.png)
 
-- **Typical price** (the middle of what's listed, so one silly auction can't throw it off) and the **cheapest** listing right now.
-- **How many auctions** are up, how many items are for sale and what a vendor pays for it.
-- **Price history** with both lines, plus a bar chart of how many were for sale each hour.
-- **The price in every region**, so you can see that Cerulean Dye goes for 31s in Europe and 54s in Taiwan.
-- **Similar items** on the auction house right now, one click away.
-- The game's own tooltip on the icon, and **Shift-click** to link the item in chat.
+**Every item has its own page:** typical and cheapest price, auctions up, items for sale, vendor price and sold per day, price history, and **Does it sell?**, which shows how often it actually sold at each price over the last week. Crafted items show what they're made from and whether crafting them is a profit or a loss, and materials show what they're used in.
 
-![An item page with price history and prices in every region](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/item.png)
+![An item page with price history, sell rates and crafting](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/item.png)
 
-## Your own auction house
+**Your items:** everything in your bags and bank, on one character or all of them, with what it sells for, sold per day, sell chance, what it's worth and whether to auction or vendor it. **Portfolio** tracks your net worth over time.
 
-Every ruleset has three auction houses, Alliance, Horde and the neutral Blackwater, and they have very different prices. The Market shows the prices on **your** auction house, picked from the realm you're on and your character's faction, so the numbers match what you see when you open the AH. You can switch to any other ruleset or house with one click.
+![Your items](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/youritems.png)
+
+**Customize** picks the tooltip lines and table columns you want, with a live preview. Open it from the Customize button, the AddOns menu or `/market options`.
+
+![Customize](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/customize.png)
 
 ## Getting prices into the game
 
 Addons can't go online, so a small companion app does that part.
 
-1. Download **LifeOnAzerothCompanion.exe** from the [latest release on GitHub](https://github.com/sanredz/LifeOnAzeroth-Addon/releases/latest) and run it. There's nothing to install.
-2. It finds your game folder and downloads fresh prices **every hour** into a small **Life on Azeroth: Data** addon. Keep that one enabled.
-3. Type `/reload` in game, or **Shift-click** the coin by your minimap, and the newest prices are loaded.
+1. Get the addon from CurseForge (you're here) so it keeps itself up to date.
+2. Download `LifeOnAzerothCompanion.exe` from the [latest release](https://github.com/sanredz/LifeOnAzeroth-Addon/releases/latest) and run it. There's nothing to install. It finds your game and downloads new prices into a small **Life on Azeroth: Data** addon while WoW is running.
+3. Type `/reload` in game, or Shift-click the coin by your minimap, to load the newest prices.
 
-The app sits quietly in the tray, can start with Windows and never pops up while you play. Windows may say it's unrecognised the first time: click **More info**, then **Run anyway**.
+It can start with Windows and keeps running in the tray. When there's a new version, the app tells you and links to the GitHub page.
+
+The app isn't code signed, so Windows may say it's unrecognised the first time: click **More info**, then **Run anyway**. Some antivirus programs have flagged older versions by mistake. If that happens to you, get the latest version from GitHub.
 
 ![The companion app](https://raw.githubusercontent.com/sanredz/LifeOnAzeroth-Addon/main/media/companion.png)
 
-## Usage
+## Commands
 
-Open the Market with `/market`, `/loa` or the coin by your minimap. `/market minimap` hides or shows the minimap button.
+| Command | Does |
+| --- | --- |
+| `/market` or `/loa` | Opens or closes the Market |
+| `/market options` | Opens Customize |
+| `/market tooltip` | Turns the tooltip lines on or off |
+| `/market minimap` | Shows or hides the minimap coin |
 
 ## What it touches
 
-The addon only draws its own window. It doesn't change the auction house, Blizzard's UI or anything else in your game, and it never sends anything.
+The addon only draws its own window and tooltip lines. It doesn't change the auction house or Blizzard's UI, and it never sends anything.
 
-The companion app only talks to lifeonazeroth.com, and only writes to the Life on Azeroth folders in your AddOns folder. The one thing it reads is your game's region setting, so it knows which prices to fetch. It doesn't touch your account, your characters or anything else on your PC.
+The companion app only talks to lifeonazeroth.com and only writes to the Life on Azeroth folders in your AddOns folder.
 
-Source and issues: [github.com/sanredz/LifeOnAzeroth-Addon](https://github.com/sanredz/LifeOnAzeroth-Addon)
+Found a bug? [Open an issue](https://github.com/sanredz/LifeOnAzeroth-Addon/issues).
+
+Source, releases and issues: [github.com/sanredz/LifeOnAzeroth-Addon](https://github.com/sanredz/LifeOnAzeroth-Addon)
 ```
