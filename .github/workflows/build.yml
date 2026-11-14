@@ -29,10 +29,23 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: LifeOnAzeroth
           path: dist
+      - name: Keep the published companion when its code is unchanged
+        run: |
+          prev=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          if [ -n "$prev" ] && git diff --quiet "$prev" "$GITHUB_REF_NAME" -- companion; then
+            if curl -fsSL -o "$RUNNER_TEMP/app.exe" "https://github.com/$GITHUB_REPOSITORY/releases/download/$prev/LifeOnAzerothCompanion.exe"; then
+              mv "$RUNNER_TEMP/app.exe" dist/LifeOnAzerothCompanion.exe
+              echo "Reusing the companion from $prev"
+            fi
+          fi
+          sha256sum dist/*
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*

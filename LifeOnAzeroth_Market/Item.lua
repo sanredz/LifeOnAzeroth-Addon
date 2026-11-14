@@ -38,6 +38,95 @@ local function listRow(parent, h)
   return r
 end
 
+local made, usedBy
+
+local function recipes()
+  if made then return end
+  made, usedBy = {}, {}
+  for _, s in ipairs(NS.RECIPES or {}) do
+    local item, spell, p, skill, icon, rg = string.match(s, "^(%d+) (%d+) (%d+) (%d+) (%d+) (.+)$")
+    if item then
+      local r = { item = tonumber(item), spell = tonumber(spell), prof = NS.PROFS[tonumber(p) + 1] or "", skill = tonumber(skill), icon = tonumber(icon), reag = {} }
+      for rid, n in string.gmatch(rg, "(%d+):(%d+)") do
+        rid = tonumber(rid)
+        r.reag[#r.reag + 1] = { rid, tonumber(n) }
+        usedBy[rid] = usedBy[rid] or {}
+        table.insert(usedBy[rid], r)
+      end
+      if r.item > 0 and (not made[r.item] or r.skill < made[r.item].skill) then made[r.item] = r end
+    end
+  end
+  for _, list in pairs(usedBy) do
+    table.sort(list, function(a, b) if a.skill ~= b.skill then return a.skill < b.skill end return a.spell < b.spell end)
+  end
+end
+
+local function recipeIcon(r)
+  if r.item > 0 then return NS.itemIcon(r.item) end
+  if r.icon > 0 then return r.icon end
+  local get = (C_Spell and C_Spell.GetSpellTexture) or GetSpellTexture
+  local ok, ic = pcall(get, r.spell)
+  return ok and ic or 134400
+end
+
+local function recipeName(r)
+  if r.item > 0 then
+    local ok, n = pcall(C_Item and C_Item.GetItemNameByID or GetItemInfo, r.item)
+    if ok and n then return n end
+    return NS.itemName and NS.itemName(r.item) or ("Item " .. r.item)
+  end
+  local ok, n = pcall(function() return C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(r.spell) or GetSpellInfo(r.spell) end)
+  return ok and n or ("Recipe " .. r.spell)
+end
+
+local function usedTip(owner, list, from)
+  local m = NS.COL.muted
+  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  GameTooltip:AddLine("Used in", NS.COL.title[1], NS.COL.title[2], NS.COL.title[3])
+  local shown = 0
+  for i = from or 1, #list do
+    if shown == 20 then
+      GameTooltip:AddLine("+" .. (#list - i + 1) .. " more", m[1], m[2], m[3])
+      break
+    end
+    local r = list[i]
+    GameTooltip:AddDoubleLine(recipeName(r), r.prof .. " " .. r.skill, 1, 1, 1, m[1], m[2], m[3])
+    shown = shown + 1
+  end
+  GameTooltip:Show()
+end
+
+local function craftIcon(parent, withCount)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(26, 26)
+  b.ic = NS.iconBox(b, 26)
+  b.ic:SetAllPoints()
+  if withCount then
+    b.n = NS.text(b, 10, NS.COL.ink)
+    b.n:SetPoint("BOTTOMRIGHT", -1, 2)
+    b.n:SetJustifyH("RIGHT")
+  end
+  b:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    local r = self.r
+    if r then
+      if r.item > 0 then GameTooltip:SetItemByID(r.item) else GameTooltip:SetSpellByID(r.spell) end
+      local m = NS.COL.muted
+      GameTooltip:AddLine(r.prof .. ", skill " .. r.skill, m[1], m[2], m[3])
+    else
+      GameTooltip:SetItemByID(self.id)
+      if self.price then GameTooltip:AddLine(self.count .. " for " .. NS.coin(self.price), 1, 1, 1) end
+    end
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  b:SetScript("OnClick", function(self)
+    local id = self.r and self.r.item or self.id
+    if id and id > 0 and LOA_DATA and LOA_DATA.cat[id] then NS.OpenItem(id, cur and cur.rg) end
+  end)
+  return b
+end
+
 local GOLD = { 0.788, 0.635, 0.29 }
 
 local function bar(parent)
@@ -319,30 +408,43 @@ local function build()
   sellBox:SetPoint("TOPLEFT")
   sellBox:SetPoint("TOPRIGHT")
   c.sell = sellBox
-  local regs = box(right, "Price in each region")
-  regs:SetPoint("TOPLEFT", sellBox, "BOTTOMLEFT", 0, -12)
-  regs:SetPoint("TOPRIGHT", sellBox, "BOTTOMRIGHT", 0, -12)
-  regs:SetHeight(34 + 2 * 50 + 4)
-  regs.rows = {}
-  for i = 1, 4 do
-    local r = listRow(regs, 48)
-    local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
-    r:SetPoint("TOPLEFT", regs, "TOP", col == 0 and -149 or 2, -34 - row * 50)
-    r:SetSize(147, 48)
-    r.rn = NS.text(r, 12, NS.COL.ink)
-    r.rn:SetPoint("TOPLEFT", 8, -5)
-    r.tag = NS.text(r, 10, NS.COL.up)
-    r.tag:SetPoint("LEFT", r.rn, "RIGHT", 6, 0)
-    r.pr = NS.text(r, 12, NS.COL.ink)
-    r.pr:SetPoint("LEFT", 8, -1)
-    r.sub = NS.text(r, 10, NS.COL.muted)
-    r.sub:SetPoint("BOTTOMLEFT", 8, 5)
-    r:SetScript("OnClick", function(self) if self.rg and self.rg ~= cur.rg then NS.OpenItem(cur.id, self.rg) end end)
-    regs.rows[i] = r
-  end
-  c.regs = regs
+  local craft = box(right, "")
+  craft:SetPoint("TOPLEFT", sellBox, "BOTTOMLEFT", 0, -12)
+  craft:SetPoint("BOTTOMRIGHT")
+  craft.title:SetPoint("TOPRIGHT", -12, -10)
+  craft.reag = {}
+  for i = 1, 9 do craft.reag[i] = craftIcon(craft, true) end
+  craft.mat = NS.text(craft, 11, NS.COL.ink2)
+  craft.mat:SetPoint("TOPLEFT", 12, -66)
+  craft.profit = NS.text(craft, 11, NS.COL.ink2)
+  craft.profit:SetPoint("TOPRIGHT", -12, -66)
+  craft.profit:SetJustifyH("RIGHT")
+  craft.uhead = CreateFrame("Frame", nil, craft)
+  craft.uhead:SetHeight(20)
+  craft.uhead:EnableMouse(true)
+  craft.uhead:SetPoint("LEFT", 12, 0)
+  craft.uhead:SetPoint("RIGHT", -12, 0)
+  craft.ut = NS.text(craft.uhead, 14, NS.COL.title2, true)
+  craft.ut:SetPoint("LEFT")
+  craft.us = NS.text(craft.uhead, 10, NS.COL.muted)
+  craft.us:SetPoint("LEFT", craft.ut, "RIGHT", 6, -1)
+  craft.us:SetPoint("RIGHT")
+  craft.uhead:SetScript("OnEnter", function(self) if self.list then usedTip(self, self.list, 1) end end)
+  craft.uhead:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  craft.used = {}
+  for i = 1, 27 do craft.used[i] = craftIcon(craft) end
+  craft.more = CreateFrame("Frame", nil, craft)
+  craft.more:SetSize(26, 26)
+  craft.more:EnableMouse(true)
+  NS.fill(craft.more, 1, 1, 1, 0.06):SetAllPoints()
+  NS.border(craft.more, NS.COL.frameDim, 1)
+  craft.more.t = NS.text(craft.more, 11, NS.COL.ink2)
+  craft.more.t:SetPoint("CENTER")
+  craft.more:SetScript("OnEnter", function(self) usedTip(self, self.list, self.from) end)
+  craft.more:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  c.craft = craft
   local kin = box(right, "Similar on the auction house")
-  kin:SetPoint("TOPLEFT", regs, "BOTTOMLEFT", 0, -12)
+  kin:SetPoint("TOPLEFT", sellBox, "BOTTOMLEFT", 0, -12)
   kin:SetPoint("BOTTOMRIGHT")
   kin.rows = {}
   for i = 1, 6 do
@@ -466,7 +568,6 @@ function NS.OpenItem(id, rg)
   local l = NS.latest(rg, id)
   local _, rsName = NS.view()
   c.pxLabel:SetText("Typical price \194\183 " .. (rsName and rg == LOA_DATA.region and (NS.houseName(rsName) .. " auction house") or (NS.REGION_NAME[rg] or rg)))
-  c.regs.title:SetText("Price in each region  " .. NS.color(NS.COL.muted, "whole region"))
   c.px:SetText(l and NS.coin(l[1]) or NS.color(NS.COL.muted, "Not listed right now"))
   c.pill:SetText(l and l[5] and (NS.pctColored(l[5]) .. NS.color(NS.COL.muted, "  24h")) or "")
   c.add:SetShown(rg == LOA_DATA.region and NS.hist(id) ~= nil)
@@ -487,43 +588,85 @@ function NS.OpenItem(id, rg)
   c.sell.sub:SetText(rg == LOA_DATA.region and "last 7 days" or ("downloaded for " .. (NS.REGION_NAME[LOA_DATA.region] or "your region") .. " only"))
   c.sell:Fill(sc, mine)
 
-  local priced, minP, minN, lowRg = {}, math.huge, 0, nil
-  local lAll = NS.latestAll(rg, id)
-  for _, r in ipairs(NS.REGIONS) do
-    local v = NS.latestAll(r, id)
-    if v and v[1] > 0 then
-      priced[#priced + 1] = r
-      if v[1] < minP then minP, minN, lowRg = v[1], 1, r elseif v[1] == minP then minN = minN + 1 end
-    end
-  end
-  if #priced < 2 or minN > 1 then lowRg = nil end
-  local i = 0
-  for _, r in ipairs(NS.REGIONS) do
-    if LOA_DATA.lat[r] then
-      i = i + 1
-      local row = c.regs.rows[i]
-      local v = NS.latestAll(r, id)
-      row.rg = r
-      row.cur = r == rg
-      row.bg:SetColorTexture(0.973, 0.827, 0.42, row.cur and 0.1 or 0)
-      row.rn:SetText(string.upper(r))
-      row.tag:SetText(r == lowRg and "cheapest" or "")
-      row.pr:SetText(v and NS.coin(v[1]) or NS.color(NS.COL.muted, "not listed"))
-      if r == rg then
-        row.sub:SetText("viewing")
-        row.sub:SetTextColor(NS.COL.muted[1], NS.COL.muted[2], NS.COL.muted[3])
-      elseif v and lAll and lAll[1] > 0 then
-        local d = 100 * (v[1] / lAll[1] - 1)
-        local col = d < 0 and NS.COL.up or d > 0 and NS.COL.dn or NS.COL.muted
-        row.sub:SetText(NS.pctText(d) .. " vs " .. string.upper(rg))
-        row.sub:SetTextColor(col[1], col[2], col[3])
-      else
-        row.sub:SetText("")
+  card:Show()
+  recipes()
+  local cr = c.craft
+  local mk, ul = made[id], usedBy[id]
+  local y = 0
+  for _, b in ipairs(cr.reag) do b:Hide() end
+  for _, b in ipairs(cr.used) do b:Hide() end
+  cr.more:Hide()
+  cr.mat:SetShown(mk ~= nil)
+  cr.profit:SetShown(mk ~= nil)
+  cr.title:SetShown(mk ~= nil)
+  if mk then
+    cr.title:SetText("Made by " .. mk.prof .. "  " .. NS.color(NS.COL.muted, "skill " .. mk.skill))
+    local cost, known = 0, true
+    for i, g in ipairs(mk.reag) do
+      local b = cr.reag[i]
+      if b then
+        local gl = NS.latest(rg, g[1])
+        b.id, b.r, b.count = g[1], nil, g[2]
+        b.price = gl and gl[1] > 0 and gl[1] * g[2] or nil
+        b.ic.icon:SetTexture(NS.itemIcon(g[1]))
+        local gc = LOA_DATA.cat[g[1]]
+        b.ic:SetQuality(gc and gc[2])
+        b.n:SetText(g[2] > 1 and g[2] or "")
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", 12 + (i - 1) * 30, -32)
+        b:Show()
       end
-      row:Show()
+      if b and b.price then cost = cost + b.price else known = false end
+    end
+    cr.mat:SetText("Materials  " .. (known and NS.coin(cost) or NS.color(NS.COL.muted, "some not listed")))
+    local margin = l and l[1] > 0 and known and (l[1] - cost) or nil
+    if margin then
+      local col = margin >= 0 and NS.COL.up or NS.COL.dn
+      cr.profit:SetText(NS.color(col, margin >= 0 and "Profit " or "Loss ") .. NS.coin(math.abs(margin)))
+    else
+      cr.profit:SetText("")
+    end
+    y = 80
+  end
+  cr.uhead:SetShown(ul ~= nil)
+  cr.uhead.list = ul
+  if ul then
+    local profs, order = {}, {}
+    for _, r in ipairs(ul) do
+      if not profs[r.prof] then profs[r.prof] = 0 order[#order + 1] = r.prof end
+      profs[r.prof] = profs[r.prof] + 1
+    end
+    table.sort(order, function(a, b) return profs[a] > profs[b] end)
+    local parts = {}
+    for _, p in ipairs(order) do parts[#parts + 1] = p .. " " .. profs[p] end
+    cr.ut:SetText("Used in " .. #ul .. (#ul == 1 and " recipe" or " recipes"))
+    cr.us:SetText(table.concat(parts, " \194\183 "))
+    cr.uhead:ClearAllPoints()
+    cr.uhead:SetPoint("TOPLEFT", 12, -y - 8)
+    cr.uhead:SetPoint("TOPRIGHT", -12, -y - 8)
+    card:Show()
+    local rows = math.floor((cr:GetHeight() - y - 32 - 6 + 4) / 30)
+    local slots = math.max(0, math.min(rows * 9, #cr.used))
+    local n = #ul > slots and slots - 1 or #ul
+    for i = 1, math.max(0, n) do
+      local b, r = cr.used[i], ul[i]
+      b.r, b.id, b.price = r, nil, nil
+      b.ic.icon:SetTexture(recipeIcon(r))
+      local rc = r.item > 0 and LOA_DATA.cat[r.item]
+      b.ic:SetQuality(rc and rc[2])
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", 12 + ((i - 1) % 9) * 30, -y - 32 - math.floor((i - 1) / 9) * 30)
+      b:Show()
+    end
+    if #ul > slots and slots > 0 then
+      cr.more.list, cr.more.from = ul, n + 1
+      cr.more.t:SetText("+" .. (#ul - n))
+      cr.more:ClearAllPoints()
+      cr.more:SetPoint("TOPLEFT", 12 + (n % 9) * 30, -y - 32 - math.floor(n / 9) * 30)
+      cr.more:Show()
     end
   end
-  for j = i + 1, 4 do c.regs.rows[j]:Hide() end
+  cr:SetShown(mk ~= nil or ul ~= nil)
 
   local L = (rg == LOA_DATA.region and NS.view().lat) or LOA_DATA.lat[rg] or {}
   local kin = {}
@@ -535,9 +678,9 @@ function NS.OpenItem(id, rg)
   table.sort(kin, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[1] < b[1] end)
   card:Show()
   local fit = math.floor((c.kin:GetHeight() - 38) / 31)
-  c.kin:SetShown(fit >= 1)
+  c.kin:SetShown(fit >= 1 and not c.craft:IsShown())
   for j, row in ipairs(c.kin.rows) do
-    local k = j <= fit and kin[j]
+    local k = j <= fit and not c.craft:IsShown() and kin[j]
     if k then
       row.id = k[1]
       row.ic.icon:SetTexture(NS.itemIcon(k[1]))

@@ -349,16 +349,17 @@ local function sampleItem()
     local l = H and H.lat and H.lat[id] or (not H and NS.latest(D.region, id))
     return l and l[1] and l[1] > 0
   end
-  if C_Container and C_Container.GetContainerNumSlots then
-    for bag = 0, 4 do
-      for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
-        local ok, info = pcall(C_Container.GetContainerItemInfo, bag, slot)
-        if ok and info and info.itemID and not info.isBound and (info.stackCount or 1) > 1 and priced(info.itemID) then return info.itemID end
-      end
-    end
-  end
   for _, id in ipairs(SAMPLES) do if priced(id) then return id end end
   for id in pairs(H and H.lat or {}) do return id end
+end
+
+local function whenLoaded(id, fn)
+  if C_Item and C_Item.IsItemDataCachedByID and C_Item.IsItemDataCachedByID(id) then return fn() end
+  if Item and Item.CreateFromItemID then
+    local it = Item:CreateFromItemID(id)
+    if it and it.ContinueOnItemLoad then it:ContinueOnItemLoad(fn) return end
+  end
+  fn()
 end
 
 function NS.BuildCustomize(host)
@@ -429,12 +430,14 @@ function NS.BuildCustomize(host)
     prev:SetPoint("TOPLEFT", prevBox, "TOPLEFT", 0, -16)
     if id then
       prevNone:Hide()
-      prev:SetItemByID(id)
-      prev:Show()
-      if prev:NumLines() <= 1 and not P.retry then
-        P.retry = true
-        C_Timer.After(0.4, function() P.retry = nil showPreview() end)
-      end
+      whenLoaded(id, function()
+        if not P:IsVisible() then return end
+        prev:SetOwner(prevBox, "ANCHOR_NONE")
+        prev:ClearAllPoints()
+        prev:SetPoint("TOPLEFT", prevBox, "TOPLEFT", 0, -16)
+        prev:SetItemByID(id)
+        prev:Show()
+      end)
     else
       prev:Hide()
       prevNone:Show()
@@ -586,6 +589,9 @@ function NS.SetupOptions()
   login:RegisterEvent("PLAYER_LOGIN")
   login:SetScript("OnEvent", function(self)
     self:UnregisterAllEvents()
+    if C_Item and C_Item.RequestLoadItemDataByID then
+      for _, id in ipairs(SAMPLES) do pcall(C_Item.RequestLoadItemDataByID, id) end
+    end
     local LDB = LibStub and LibStub("LibDataBroker-1.1", true)
     if LDB and not NS.ldb then
       NS.ldb = LDB:NewDataObject("LifeOnAzerothMarket", {

@@ -210,9 +210,9 @@ local function paintSide()
   local side = main.side
   local d = D()
   local span = NS.rangeSpan(NS.db.range)
-  local per = ({ ["6H"] = "last 6 hours", ["1D"] = "last 24 hours", ["1W"] = "last 7 days", ["1M"] = "last 30 days", ALL = "since tracking began" })[NS.db.range]
+  local per = ({ ["6H"] = "over the last 6 hours", ["1D"] = "over the last 24 hours", ["1W"] = "over the last 7 days", ["1M"] = "over the last 30 days", ALL = "since tracking began" })[NS.db.range]
   local short = ({ ["6H"] = "6H", ["1D"] = "24H", ["1W"] = "7D", ["1M"] = "30D", ALL = "ALL TIME" })[NS.db.range]
-  side.per:SetText("Change over the " .. NS.color(NS.COL.gold, per))
+  side.per:SetText("Change " .. NS.color(NS.COL.gold, per))
   side.hch:SetText(short)
   for _, r in ipairs(side.rows) do r:Hide() end
   for _, h in ipairs(side.heads) do h:Hide() end
