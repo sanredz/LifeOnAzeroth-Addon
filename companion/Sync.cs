@@ -551,8 +551,15 @@ namespace LifeOnAzeroth
             Exception shardErr = null;
             progress("Downloading price history", 0.22);
             string[] parts = null;
-            try { parts = SplitBundle(Get("/shards/" + region), 64); } catch { parts = null; }
-            Parallel.For(0, 64, new ParallelOptions { MaxDegreeOfParallelism = 6 }, sh =>
+            try { parts = SplitBundle(Get("/shards/" + region), 64); }
+            catch (WebException ex)
+            {
+                var hr = ex.Response as HttpWebResponse;
+                if (hr == null || (int)hr.StatusCode >= 500) throw new Exception("The price history is busy right now.");
+                parts = null;
+            }
+            catch { parts = null; }
+            Parallel.For(0, 64, new ParallelOptions { MaxDegreeOfParallelism = 2 }, sh =>
             {
                 try
                 {

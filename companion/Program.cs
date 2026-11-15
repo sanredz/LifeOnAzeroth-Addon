@@ -27,7 +27,7 @@ namespace LifeOnAzeroth
 {
     static partial class Program
     {
-        public const string Version = "1.0.10";
+        public const string Version = "1.0.12";
         public static int ShowMsg;
 
         [DllImport("user32.dll")] static extern int RegisterWindowMessage(string msg);
@@ -755,6 +755,8 @@ namespace LifeOnAzeroth
             Invalidate();
         }
 
+        static readonly Random Jitter = new Random();
+
         void CheckNow(bool force)
         {
             if (busy) return;
@@ -808,12 +810,12 @@ namespace LifeOnAzeroth
             lastCheck = DateTime.Now;
             if (ex != null)
             {
-                nextCheck = DateTime.Now.AddMinutes(5);
+                nextCheck = DateTime.Now.AddMinutes(10 + Jitter.Next(11));
                 bool net = ex is WebException;
-                SetStatus(net ? "Can't reach Life on Azeroth" : "Something went wrong", (net ? "Check your internet connection. " : ex.Message + " ") + "Trying again in 5 minutes.", Theme.Down);
+                SetStatus(net ? "Can't reach Life on Azeroth" : "Something went wrong", (net ? "Check your internet connection. " : ex.Message + " ") + "Trying again in a few minutes.", Theme.Down);
                 return;
             }
-            nextCheck = DateTime.Now.AddMinutes(15);
+            nextCheck = DateTime.Now.AddMinutes(30 + Jitter.Next(11));
             nextAppCheck = DateTime.Now.AddHours(6);
             SetApp(res.App);
             if (res.Changed)
