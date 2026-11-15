@@ -490,9 +490,55 @@ namespace LifeOnAzeroth
             return "?";
         }
 
+        static string CacheFile(string name)
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LifeOnAzeroth", "cache");
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, name);
+        }
+
+        static string Cached(string name, TimeSpan maxAge, string path)
+        {
+            string file = null;
+            try
+            {
+                file = CacheFile(name);
+                if (File.Exists(file) && DateTime.UtcNow - File.GetLastWriteTimeUtc(file) < maxAge) return File.ReadAllText(file, Encoding.UTF8);
+            }
+            catch { }
+            string text = Get(path);
+            try
+            {
+                if (file != null)
+                {
+                    File.WriteAllText(file, text, Encoding.UTF8);
+                    if (name.StartsWith("catalog-"))
+                        foreach (var old in Directory.GetFiles(Path.GetDirectoryName(file), "catalog-*.json"))
+                            if (!string.Equals(old, file, StringComparison.OrdinalIgnoreCase)) File.Delete(old);
+                }
+            }
+            catch { }
+            return text;
+        }
+
         public static SyncResult Run(string forever, string region, long lastLatest, Action<string, double> progress)
         {
             progress("Checking for new prices", 0.02);
+            string dataFile = Path.Combine(DataDir(forever), "Data.lua");
+            long catVer = 0;
+            try
+            {
+                var lat = Obj(Json(Get("/latest/" + region)));
+                long lt = Lng(Field(lat, "t"));
+                catVer = Lng(Field(lat, "cat"));
+                var latApp = ParseApp(lat);
+                if (lt != 0 && lt == lastLatest && File.Exists(dataFile) && new FileInfo(dataFile).Length > 1000 && DataFormat(dataFile) == Format)
+                {
+                    if (latApp != null) MarkApp(forever, latApp);
+                    return new SyncResult { Changed = false, Latest = lt, Snapshots = 0, App = latApp };
+                }
+            }
+            catch { }
             var markets = new Dictionary<string, Dictionary<string, object>>();
             var own = Obj(Json(Get("/market/" + region)));
             markets[region] = own;
@@ -501,7 +547,6 @@ namespace LifeOnAzeroth
             var T = Arr(Field(state, "t")).Select(Lng).ToArray();
             if (T.Length == 0) throw new Exception("No market data for this region yet.");
             long latest = T[T.Length - 1];
-            string dataFile = Path.Combine(DataDir(forever), "Data.lua");
             if (latest == lastLatest && File.Exists(dataFile) && new FileInfo(dataFile).Length > 1000 && DataFormat(dataFile) == Format)
             {
                 MarkApp(forever, app);
@@ -509,13 +554,13 @@ namespace LifeOnAzeroth
             }
 
             progress("Downloading the item catalog", 0.06);
-            var cat = Obj(Json(Get("/catalog")));
+            var cat = Obj(Json(catVer != 0 ? Cached("catalog-" + catVer + ".json", TimeSpan.FromDays(7), "/catalog") : Get("/catalog")));
             int done = 0;
             foreach (string r in Regions)
             {
                 if (r == region) continue;
                 progress("Downloading prices in other regions", 0.1 + 0.03 * done++);
-                try { markets[r] = Obj(Json(Get("/market/" + r))); } catch { }
+                try { markets[r] = Obj(Json(Cached("market-" + r + ".json", TimeSpan.FromHours(3), "/market/" + r))); } catch { }
             }
             var houses = new Dictionary<string, Dictionary<string, object>>();
             int hd = 0;
