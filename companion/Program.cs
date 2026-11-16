@@ -21,7 +21,7 @@ using Microsoft.Win32;
 [assembly: AssemblyCopyright("© 2026 Life on Azeroth")]
 [assembly: AssemblyVersion("1.0.12.0")]
 [assembly: AssemblyFileVersion("1.0.12.0")]
-[assembly: AssemblyInformationalVersion("1.0.10")]
+[assembly: AssemblyInformationalVersion("1.0.12")]
 
 namespace LifeOnAzeroth
 {
