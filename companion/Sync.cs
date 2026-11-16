@@ -32,7 +32,8 @@ namespace LifeOnAzeroth
 
     public static class Sync
     {
-        public static readonly string Api = Environment.GetEnvironmentVariable("LOA_API") ?? "https://forever-live.sanredz.workers.dev/v1";
+        public static readonly string Home = Environment.GetEnvironmentVariable("LOA_API") ?? "https://forever-live.sanredz.workers.dev/v1";
+        public static string Api = Home;
         public const string AddonName = "LifeOnAzeroth_Market";
         public const string DataName = "LifeOnAzeroth_Data";
         static readonly string[] LegacyFiles = { "LifeOnAzeroth.toc", "Core.lua", "Chart.lua", "Item.lua", "UI.lua", "Data.lua" };
@@ -528,7 +529,10 @@ namespace LifeOnAzeroth
             long catVer = 0;
             try
             {
+                Api = Home;
                 var lat = Obj(Json(Get("/latest/" + region)));
+                var moved = Convert.ToString(Field(lat, "api"), Inv);
+                if (!string.IsNullOrEmpty(moved) && moved.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) Api = moved.TrimEnd('/');
                 long lt = Lng(Field(lat, "t"));
                 catVer = Lng(Field(lat, "cat"));
                 var latApp = ParseApp(lat);
